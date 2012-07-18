@@ -53,8 +53,7 @@ type Keys struct {
 // The default Service used by Sign.
 var DefaultService = &Service{"amazonaws.com"}
 
-// Sign signs an HTTP request with the given S3 keys for use on the service
-// DefaultService.
+// Sign signs an HTTP request with the given S3 keys.
 //
 // This function is shorthand for DefaultService.Sign(r, k).
 func Sign(r *http.Request, k Keys) {
