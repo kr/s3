@@ -1,4 +1,4 @@
-// Package s3 signs HTTP requests according to the method described in
+// Package s3 signs HTTP requests as prescribed in
 // http://docs.amazonwebservices.com/AmazonS3/2006-03-01/dev/RESTAuthentication.html.
 package s3
 
