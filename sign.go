@@ -12,14 +12,6 @@ import (
 	"strings"
 )
 
-var (
-	amp   = []byte{'&'}
-	dot   = []byte{'.'}
-	nl    = []byte{'\n'}
-	qmark = []byte{'?'}
-	slash = []byte{'/'}
-)
-
 var signParams = map[string]bool{
 	"acl":                          true,
 	"lifecycle":                    true,
@@ -76,15 +68,15 @@ func (s *Service) Sign(r *http.Request, k Keys) {
 
 func (s *Service) writeSigData(w io.Writer, r *http.Request) {
 	w.Write([]byte(r.Method))
-	w.Write(nl)
+	w.Write([]byte{'\n'})
 	w.Write([]byte(r.Header.Get("content-md5")))
-	w.Write(nl)
+	w.Write([]byte{'\n'})
 	w.Write([]byte(r.Header.Get("content-type")))
-	w.Write(nl)
+	w.Write([]byte{'\n'})
 	if _, ok := r.Header["X-Amz-Date"]; !ok {
 		w.Write([]byte(r.Header.Get("date")))
 	}
-	w.Write(nl)
+	w.Write([]byte{'\n'})
 	writeAmzHeaders(w, r)
 	s.writeResource(w, r)
 }
@@ -104,13 +96,13 @@ func (s *Service) writeVhostBucket(w io.Writer, host string) {
 		host = host[:i]
 	}
 	if !strings.HasSuffix(host, "."+s.Domain) {
-		w.Write(slash)
+		w.Write([]byte{'/'})
 		w.Write([]byte(strings.ToLower(host)))
 	} else if a := strings.Split(host, "."); len(a) > 3 {
-		w.Write(slash)
+		w.Write([]byte{'/'})
 		w.Write([]byte(a[0]))
 		for _, s := range a[1 : len(a)-3] { // omit .s3.amazonaws.com
-			w.Write(dot)
+			w.Write([]byte{'.'})
 			w.Write([]byte(s))
 		}
 	}
@@ -130,11 +122,11 @@ func (s *Service) writeSubResource(w io.Writer, r *http.Request) {
 		}
 	}
 	sort.Strings(a)
-	p := qmark
+	var p byte = '?'
 	for _, s := range a {
-		w.Write(p)
+		w.Write([]byte{p})
 		w.Write([]byte(s))
-		p = amp
+		p = '&'
 	}
 }
 
@@ -149,6 +141,6 @@ func writeAmzHeaders(w io.Writer, r *http.Request) {
 	sort.Strings(a)
 	for _, h := range a {
 		w.Write([]byte(h))
-		w.Write(nl)
+		w.Write([]byte{'\n'})
 	}
 }
