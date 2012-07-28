@@ -1,14 +1,14 @@
 package s3_test
 
 import (
-	"strings"
-	"log"
-	"net/http"
-	"time"
-	"strconv"
 	"fmt"
 	"github.com/kr/s3"
+	"log"
+	"net/http"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 )
 
 func ExampleSign() {
