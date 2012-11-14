@@ -1,8 +1,7 @@
-package s3_test
+package s3
 
 import (
 	"fmt"
-	"github.com/kr/s3"
 	"log"
 	"net/http"
 	"os"
@@ -11,7 +10,7 @@ import (
 )
 
 func ExampleSign() {
-	keys := s3.Keys{
+	keys := Keys{
 		os.Getenv("S3_ACCESS_KEY"),
 		os.Getenv("S3_SECRET_KEY"),
 	}
@@ -20,10 +19,11 @@ func ExampleSign() {
 	r.ContentLength = int64(data.Len())
 	r.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	r.Header.Set("X-Amz-Acl", "public-read")
-	s3.Sign(r, keys)
+	Sign(r, keys)
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	fmt.Println(resp.StatusCode)
 }
