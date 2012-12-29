@@ -200,7 +200,6 @@ func (u *uploader) Close() error {
 		return err
 	}
 	b := bytes.NewBuffer(body)
-	println(b.String())
 	v := url.Values{}
 	v.Set("uploadId", u.UploadId)
 	req, err := http.NewRequest("POST", u.url+"?"+v.Encode(), b)
