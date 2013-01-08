@@ -111,6 +111,20 @@ var signTest = []struct {
 		"GET\n\n\nWed, 28 Mar 2007 01:49:49 +0000\n/dictionary/fran%C3%A7ais/pr%C3%A9f%C3%A8re",
 		"AWS AKIAIOSFODNN7EXAMPLE:81VEw/Bc3GDt/k65Xrrk3AdfI4c=",
 	},
+	{
+		"POST",
+		// ?delete is required in CanonicalizedResource for:
+		// http://docs.amazonwebservices.com/AmazonS3/latest/API/multiobjectdeleteapi.html
+		"http://bucketname.S3.amazonaws.com/?delete",
+		http.Header{
+			"x-amz-date":     {"Wed, 30 Nov 2011 03:39:05 GMT"},
+			"Content-MD5":    {"p5/WA/oEr30qrEEl21PAqw=="},
+			"Content-Length": {"125"},
+		},
+		"POST\np5/WA/oEr30qrEEl21PAqw==\n\n\nx-amz-date:Wed, 30 Nov 2011 03:39:05 GMT\n/bucketname/?delete",
+		// Doesn't match the example in the Amazon docs
+		"AWS AKIAIOSFODNN7EXAMPLE:DXGmXMY+1QnRGC7vicUqu1gTmK4=",
+	},
 }
 
 func TestSign(t *testing.T) {
