@@ -14,6 +14,7 @@ import (
 
 var signParams = map[string]bool{
 	"acl":                          true,
+	"delete":                       true,
 	"lifecycle":                    true,
 	"location":                     true,
 	"logging":                      true,
