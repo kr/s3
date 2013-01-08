@@ -22,6 +22,12 @@ var signParams = map[string]bool{
 	"partNumber":                   true,
 	"policy":                       true,
 	"requestPayment":               true,
+	"response-cache-control":       true,
+	"response-content-disposition": true,
+	"response-content-encoding":    true,
+	"response-content-language":    true,
+	"response-content-type":        true,
+	"response-expires":             true,
 	"torrent":                      true,
 	"uploadId":                     true,
 	"uploads":                      true,
@@ -29,12 +35,6 @@ var signParams = map[string]bool{
 	"versioning":                   true,
 	"versions":                     true,
 	"website":                      true,
-	"response-content-type":        true,
-	"response-content-language":    true,
-	"response-expires":             true,
-	"response-cache-control":       true,
-	"response-content-disposition": true,
-	"response-content-encoding":    true,
 }
 
 // Keys holds a set of Amazon Security Credentials.
