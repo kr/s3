@@ -11,8 +11,8 @@ import (
 
 func ExampleSign() {
 	keys := Keys{
-		os.Getenv("S3_ACCESS_KEY"),
-		os.Getenv("S3_SECRET_KEY"),
+		AccessKey: os.Getenv("S3_ACCESS_KEY"),
+		SecretKey: os.Getenv("S3_SECRET_KEY"),
 	}
 	data := strings.NewReader("hello, world")
 	r, _ := http.NewRequest("PUT", "https://example.s3.amazonaws.com/foo", data)

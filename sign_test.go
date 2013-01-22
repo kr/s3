@@ -7,8 +7,15 @@ import (
 )
 
 var exKeys = Keys{
-	"AKIAIOSFODNN7EXAMPLE",
-	"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+	AccessKey: "AKIAIOSFODNN7EXAMPLE",
+	SecretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+}
+
+// Temporary Credentials
+var tokenExKeys = Keys{
+	AccessKey:     "AKIAIOSFODNN7EXAMPLE",
+	SecretKey:     "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+	SecurityToken: "dummy",
 }
 
 var signTest = []struct {
@@ -153,6 +160,16 @@ func TestSign(t *testing.T) {
 			t.Errorf("in %s:", r.Method)
 			t.Logf("url %s", r.URL.String())
 			t.Logf("exp %q", ts.expSig)
+			t.Logf("got %q", got)
+		}
+
+        // Reset Auth header and test signing with temporary credentials
+		r.Header.Del("Authorization")
+		DefaultService.Sign(r, tokenExKeys)
+		if got := r.Header.Get("X-Amz-Security-Token"); got != tokenExKeys.SecurityToken {
+			t.Errorf("in %s:", r.Method)
+			t.Logf("url %s", r.URL.String())
+			t.Logf("exp %q", tokenExKeys.SecurityToken)
 			t.Logf("got %q", got)
 		}
 	}
