@@ -43,6 +43,10 @@ var signParams = map[string]bool{
 type Keys struct {
 	AccessKey string
 	SecretKey string
+	// Used for temporary security credentials. Leave blank to use
+	// standard AWS Account or IAM credentials.
+	// See http://docs.aws.amazon.com/AmazonS3/latest/dev/MakingRequests.html#TypesofSecurityCredentials
+	SecurityToken string
 }
 
 // The default Service used by Sign.
@@ -62,6 +66,9 @@ type Service struct {
 
 // Sign signs an HTTP request with the given S3 keys for use on service s.
 func (s *Service) Sign(r *http.Request, k Keys) {
+	if k.SecurityToken != "" {
+		r.Header.Set("X-Amz-Security-Token", k.SecurityToken)
+	}
 	h := hmac.New(sha1.New, []byte(k.SecretKey))
 	s.writeSigData(h, r)
 	sig := make([]byte, base64.StdEncoding.EncodedLen(h.Size()))
