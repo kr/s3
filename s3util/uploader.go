@@ -5,7 +5,6 @@ import (
 	"encoding/xml"
 	"github.com/kr/s3"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -88,7 +87,7 @@ func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) 
 	u.s3.Sign(r, u.keys)
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {

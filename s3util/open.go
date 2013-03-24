@@ -2,7 +2,6 @@ package s3util
 
 import (
 	"io"
-	"log"
 	"net/http"
 	"time"
 )
@@ -21,7 +20,7 @@ func Open(url string, c *Config) (io.ReadCloser, error) {
 	c.Sign(r, *c.Keys)
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	if resp.StatusCode != 200 {
 		return nil, newRespError(resp)
