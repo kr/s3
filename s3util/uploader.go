@@ -194,7 +194,7 @@ func (u *uploader) Close() error {
 		return u.err
 	}
 
-	body, err := xml.MarshalIndent(u.xml, "", "    ")
+	body, err := xml.Marshal(u.xml)
 	if err != nil {
 		return err
 	}
