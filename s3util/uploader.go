@@ -15,8 +15,10 @@ import (
 
 // defined by amazon
 const (
-	minPartSize int64 = 5 << 20
-	maxNPart          = 10000
+	minPartSize = 5 * 1024 * 1024
+	maxPartSize = 1<<31 - 1 // for 32-bit use; amz max is 5GiB
+	maxObjSize  = 5 * 1024 * 1024 * 1024 * 1024
+	maxNPart    = 10000
 )
 
 const (
@@ -39,6 +41,7 @@ type uploader struct {
 	url      string
 	UploadId string // written by xml decoder
 
+	bufsz  int
 	buf    []byte
 	off    int
 	ch     chan *part
@@ -74,6 +77,7 @@ func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) 
 	u.s3 = *c.Service
 	u.url = url
 	u.keys = *c.Keys
+	u.bufsz = minPartSize
 	r, err := http.NewRequest("POST", url+"?uploads", nil)
 	if err != nil {
 		return nil, err
@@ -113,7 +117,11 @@ func (u *uploader) Write(p []byte) (n int, err error) {
 	}
 	for n < len(p) {
 		if cap(u.buf) == 0 {
-			u.buf = make([]byte, minPartSize)
+			u.buf = make([]byte, u.bufsz)
+			// Increase part size (1.001x).
+			// This lets us reach the max object size (5TiB) while
+			// still doing minimal buffering for small objects.
+			u.bufsz = min(u.bufsz+u.bufsz/1000, maxPartSize)
 		}
 		r := copy(u.buf[u.off:], p[n:])
 		u.off += r
@@ -238,4 +246,11 @@ func (u *uploader) abort() {
 	if resp.StatusCode != 200 {
 		return
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
