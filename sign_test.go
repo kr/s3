@@ -182,47 +182,47 @@ var bucketTest = []struct {
 }{
 	{
 		"http://johnsmith.s3.amazonaws.com/photos/puppy.jpg",
-		DefaultService,
+		&Service{Domain: "amazonaws.com"},
 		"/johnsmith",
 	},
 	{
 		"http://johnsmith.s3-ap-northeast-1.amazonaws.com/photos/puppy.jpg",
-		DefaultService,
+		&Service{Domain: "amazonaws.com"},
 		"/johnsmith",
 	},
 	{
 		"http://johnsmith.s3.amazonaws.com/?prefix=photos&max-keys=50&marker=puppy",
-		DefaultService,
+		&Service{Domain: "amazonaws.com"},
 		"/johnsmith",
 	},
 	{
 		"http://johnsmith.s3.amazonaws.com/?acl",
-		DefaultService,
+		&Service{Domain: "amazonaws.com"},
 		"/johnsmith",
 	},
 	{
 		"http://s3.amazonaws.com/johnsmith/photos/puppy.jpg",
-		DefaultService,
+		&Service{Domain: "amazonaws.com"},
 		"",
 	},
 	{
 		"http://static.johnsmith.net:8080/db-backup.dat.gz",
-		DefaultService,
+		&Service{Domain: "amazonaws.com"},
 		"/static.johnsmith.net",
 	},
 	{
 		"http://s3.amazonaws.com/",
-		DefaultService,
+		&Service{Domain: "amazonaws.com"},
 		"",
 	},
 	{
 		"http://s3.amazonaws.com/dictionary/fran%C3%A7ais/pr%C3%A9f%C3%A8re",
-		DefaultService,
+		&Service{Domain: "amazonaws.com"},
 		"",
 	},
 	{
 		"http://bucketname.S3.amazonaws.com/?delete",
-		DefaultService,
+		&Service{Domain: "amazonaws.com"},
 		"/bucketname",
 	},
 }
