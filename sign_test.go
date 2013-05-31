@@ -174,3 +174,69 @@ func TestSign(t *testing.T) {
 		}
 	}
 }
+
+var bucketTest = []struct {
+	url string
+	svc *Service
+	w   string
+}{
+	{
+		"http://johnsmith.s3.amazonaws.com/photos/puppy.jpg",
+		DefaultService,
+		"/johnsmith",
+	},
+	{
+		"http://johnsmith.s3-ap-northeast-1.amazonaws.com/photos/puppy.jpg",
+		DefaultService,
+		"/johnsmith",
+	},
+	{
+		"http://johnsmith.s3.amazonaws.com/?prefix=photos&max-keys=50&marker=puppy",
+		DefaultService,
+		"/johnsmith",
+	},
+	{
+		"http://johnsmith.s3.amazonaws.com/?acl",
+		DefaultService,
+		"/johnsmith",
+	},
+	{
+		"http://s3.amazonaws.com/johnsmith/photos/puppy.jpg",
+		DefaultService,
+		"",
+	},
+	{
+		"http://static.johnsmith.net:8080/db-backup.dat.gz",
+		DefaultService,
+		"/static.johnsmith.net",
+	},
+	{
+		"http://s3.amazonaws.com/",
+		DefaultService,
+		"",
+	},
+	{
+		"http://s3.amazonaws.com/dictionary/fran%C3%A7ais/pr%C3%A9f%C3%A8re",
+		DefaultService,
+		"",
+	},
+	{
+		"http://bucketname.S3.amazonaws.com/?delete",
+		DefaultService,
+		"/bucketname",
+	},
+}
+
+func TestVhostBucket(t *testing.T) {
+	for i, ts := range bucketTest {
+		r, err := http.NewRequest("GET", ts.url, nil)
+		if err != nil {
+			panic(err)
+		}
+		var g bytes.Buffer
+		ts.svc.writeVhostBucket(&g, r.Host)
+		if g.String() != ts.w {
+			t.Errorf("test %d: want %q, got %q", i, ts.w, g.String())
+		}
+	}
+}
