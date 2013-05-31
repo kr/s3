@@ -41,7 +41,7 @@ type uploader struct {
 	url      string
 	UploadId string // written by xml decoder
 
-	bufsz  int
+	bufsz  int64
 	buf    []byte
 	off    int
 	ch     chan *part
@@ -117,7 +117,7 @@ func (u *uploader) Write(p []byte) (n int, err error) {
 	}
 	for n < len(p) {
 		if cap(u.buf) == 0 {
-			u.buf = make([]byte, u.bufsz)
+			u.buf = make([]byte, int(u.bufsz))
 			// Increase part size (1.001x).
 			// This lets us reach the max object size (5TiB) while
 			// still doing minimal buffering for small objects.
@@ -248,7 +248,7 @@ func (u *uploader) abort() {
 	}
 }
 
-func min(a, b int) int {
+func min(a, b int64) int64 {
 	if a < b {
 		return a
 	}
