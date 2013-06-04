@@ -49,8 +49,20 @@ type Keys struct {
 	SecurityToken string
 }
 
+// IdentityBucket returns subdomain as-is.
+func IdentityBucket(subdomain string) string {
+	return subdomain
+}
+
+// AmazonBucket returns up to last section of subdomain.
+// Intended to be used with Amazon S3 service: "johnsmith.s3-eu-west-1" => "johnsmith".
+func AmazonBucket(subdomain string) string {
+	s := strings.Split(subdomain, ".")
+	return strings.Join(s[:len(s)-1], ".")
+}
+
 // The default Service used by Sign.
-var DefaultService = &Service{"amazonaws.com"}
+var DefaultService = &Service{Domain: "amazonaws.com"}
 
 // Sign signs an HTTP request with the given S3 keys.
 //
@@ -61,7 +73,8 @@ func Sign(r *http.Request, k Keys) {
 
 // Service represents an S3-compatible service.
 type Service struct {
-	Domain string // used to derive a bucket name from an http.Request
+	Domain string                        // service root domain, used to extract subdomain from an http.Request and pass it to Bucket
+	Bucket func(subdomain string) string // function used to derive a bucket name from subdomain; if nil, AmazonBucket is used
 }
 
 // Sign signs an HTTP request with the given S3 keys for use on service s.
@@ -92,7 +105,7 @@ func (s *Service) writeSigData(w io.Writer, r *http.Request) {
 }
 
 func (s *Service) writeResource(w io.Writer, r *http.Request) {
-	s.writeVhostBucket(w, r.Host)
+	s.writeVhostBucket(w, strings.ToLower(r.Host))
 	path := r.URL.RequestURI()
 	if r.URL.RawQuery != "" {
 		path = path[:len(path)-len(r.URL.RawQuery)-1]
@@ -105,16 +118,25 @@ func (s *Service) writeVhostBucket(w io.Writer, host string) {
 	if i := strings.Index(host, ":"); i != -1 {
 		host = host[:i]
 	}
-	if !strings.HasSuffix(host, "."+s.Domain) {
-		w.Write([]byte{'/'})
-		w.Write([]byte(strings.ToLower(host)))
-	} else if a := strings.Split(host, "."); len(a) > 3 {
-		w.Write([]byte{'/'})
-		w.Write([]byte(a[0]))
-		for _, s := range a[1 : len(a)-3] { // omit .s3.amazonaws.com
-			w.Write([]byte{'.'})
-			w.Write([]byte(s))
+
+	if host == s.Domain {
+		// no vhost - do nothing
+	} else if strings.HasSuffix(host, "."+s.Domain) {
+		// vhost - bucket may be in prefix
+		b := s.Bucket
+		if b == nil {
+			b = AmazonBucket
 		}
+		bucket := b(host[:len(host)-len(s.Domain)-1])
+
+		if bucket != "" {
+			w.Write([]byte{'/'})
+			w.Write([]byte(bucket))
+		}
+	} else {
+		// cname - bucket is host
+		w.Write([]byte{'/'})
+		w.Write([]byte(host))
 	}
 }
 
