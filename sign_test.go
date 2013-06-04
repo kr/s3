@@ -18,14 +18,21 @@ var tokenExKeys = Keys{
 	SecurityToken: "dummy",
 }
 
+var StorageIOService = &Service{
+	Domain: "storage.io",
+	Bucket: IdentityBucket,
+}
+
 var signTest = []struct {
-	method string
-	url    string
-	more   http.Header
-	expBuf string
-	expSig string
+	service *Service
+	method  string
+	url     string
+	more    http.Header
+	expBuf  string
+	expSig  string
 }{
 	{
+		DefaultService,
 		"GET",
 		"http://johnsmith.s3.amazonaws.com/photos/puppy.jpg",
 		http.Header{
@@ -35,6 +42,7 @@ var signTest = []struct {
 		"AWS AKIAIOSFODNN7EXAMPLE:bWq2s1WEIj+Ydj0vQ697zp+IXMU=",
 	},
 	{
+		DefaultService,
 		"PUT",
 		"http://johnsmith.s3.amazonaws.com/photos/puppy.jpg",
 		http.Header{
@@ -46,6 +54,7 @@ var signTest = []struct {
 		"AWS AKIAIOSFODNN7EXAMPLE:MyyxeRY7whkBe+bq8fHCL/2kKUg=",
 	},
 	{
+		DefaultService,
 		"GET",
 		"http://johnsmith.s3.amazonaws.com/?prefix=photos&max-keys=50&marker=puppy",
 		http.Header{
@@ -56,6 +65,7 @@ var signTest = []struct {
 		"AWS AKIAIOSFODNN7EXAMPLE:htDYFYduRNen8P9ZfE/s9SuKy0U=",
 	},
 	{
+		DefaultService,
 		"GET",
 		"http://johnsmith.s3.amazonaws.com/?acl",
 		http.Header{
@@ -65,6 +75,7 @@ var signTest = []struct {
 		"AWS AKIAIOSFODNN7EXAMPLE:c2WLPFtWHVgbEmeEG93a4cG37dM=",
 	},
 	{
+		DefaultService,
 		"DELETE",
 		"http://s3.amazonaws.com/johnsmith/photos/puppy.jpg",
 		http.Header{
@@ -80,6 +91,7 @@ var signTest = []struct {
 		"AWS AKIAIOSFODNN7EXAMPLE:R4dJ53KECjStyBO5iTBJZ4XVOaI=",
 	},
 	{
+		DefaultService,
 		"PUT",
 		"http://static.johnsmith.net:8080/db-backup.dat.gz",
 		http.Header{
@@ -99,6 +111,7 @@ var signTest = []struct {
 		"AWS AKIAIOSFODNN7EXAMPLE:ilyl83RwaSoYIEdixDQcA4OnAnc=",
 	},
 	{
+		DefaultService,
 		"GET",
 		"http://s3.amazonaws.com/",
 		http.Header{
@@ -108,6 +121,7 @@ var signTest = []struct {
 		"AWS AKIAIOSFODNN7EXAMPLE:qGdzdERIC03wnaRNKh6OqZehG9s=",
 	},
 	{
+		DefaultService,
 		"GET",
 		// I've altered this example from the one documented by Amazon
 		// since package http never produces lower-case %-encodings.
@@ -119,6 +133,7 @@ var signTest = []struct {
 		"AWS AKIAIOSFODNN7EXAMPLE:81VEw/Bc3GDt/k65Xrrk3AdfI4c=",
 	},
 	{
+		DefaultService,
 		"POST",
 		// ?delete is required in CanonicalizedResource for:
 		// http://docs.amazonwebservices.com/AmazonS3/latest/API/multiobjectdeleteapi.html
@@ -131,6 +146,26 @@ var signTest = []struct {
 		"POST\np5/WA/oEr30qrEEl21PAqw==\n\n\nx-amz-date:Wed, 30 Nov 2011 03:39:05 GMT\n/bucketname/?delete",
 		// Doesn't match the example in the Amazon docs
 		"AWS AKIAIOSFODNN7EXAMPLE:DXGmXMY+1QnRGC7vicUqu1gTmK4=",
+	},
+	{
+		StorageIOService,
+		"GET",
+		"http://bucket.storage.io/ubuntu-12.04.2-server-amd64.iso",
+		http.Header{
+			"Date": {"Tue, 27 Mar 2007 19:36:42 +0000"},
+		},
+		"GET\n\n\nTue, 27 Mar 2007 19:36:42 +0000\n/bucket/ubuntu-12.04.2-server-amd64.iso",
+		"AWS AKIAIOSFODNN7EXAMPLE:eLAv1CJmnBwV4DXj2z508eunQQs=",
+	},
+	{
+		StorageIOService,
+		"GET",
+		"http://storage.io/bucket/ubuntu-12.04.2-server-amd64.iso",
+		http.Header{
+			"Date": {"Tue, 27 Mar 2007 19:36:42 +0000"},
+		},
+		"GET\n\n\nTue, 27 Mar 2007 19:36:42 +0000\n/bucket/ubuntu-12.04.2-server-amd64.iso",
+		"AWS AKIAIOSFODNN7EXAMPLE:eLAv1CJmnBwV4DXj2z508eunQQs=",
 	},
 }
 
@@ -147,7 +182,7 @@ func TestSign(t *testing.T) {
 			}
 		}
 		var buf bytes.Buffer
-		DefaultService.writeSigData(&buf, r)
+		ts.service.writeSigData(&buf, r)
 		if buf.String() != ts.expBuf {
 			t.Errorf("in %s:", r.Method)
 			t.Logf("url %s", r.URL.String())
@@ -155,7 +190,7 @@ func TestSign(t *testing.T) {
 			t.Logf("got %q", buf.String())
 		}
 
-		DefaultService.Sign(r, exKeys)
+		ts.service.Sign(r, exKeys)
 		if got := r.Header.Get("Authorization"); got != ts.expSig {
 			t.Errorf("in %s:", r.Method)
 			t.Logf("url %s", r.URL.String())
@@ -165,7 +200,7 @@ func TestSign(t *testing.T) {
 
 		// Reset Auth header and test signing with temporary credentials
 		r.Header.Del("Authorization")
-		DefaultService.Sign(r, tokenExKeys)
+		ts.service.Sign(r, tokenExKeys)
 		if got := r.Header.Get("X-Amz-Security-Token"); got != tokenExKeys.SecurityToken {
 			t.Errorf("in %s:", r.Method)
 			t.Logf("url %s", r.URL.String())
@@ -221,9 +256,19 @@ var bucketTest = []struct {
 		"",
 	},
 	{
-		"http://bucketname.S3.amazonaws.com/?delete",
+		"http://bucketname.s3.amazonaws.com/?delete",
 		&Service{Domain: "amazonaws.com"},
 		"/bucketname",
+	},
+	{
+		"http://johnsmith.storage.io/photos/puppy.jpg",
+		&Service{Domain: "storage.io", Bucket: IdentityBucket},
+		"/johnsmith",
+	},
+	{
+		"http://static.johnsmith.net:8080/db-backup.dat.gz",
+		&Service{Domain: "storage.io", Bucket: IdentityBucket},
+		"/static.johnsmith.net",
 	},
 }
 
