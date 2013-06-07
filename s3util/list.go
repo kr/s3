@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 )
@@ -19,7 +20,9 @@ const (
 	ContentsFile   = "file"
 	ContentsFolder = "folder"
 )
-const folderSuffix = "_$folder$"
+
+const folderSuffix1 = "/"
+const folderSuffix2 = "_$folder$"
 
 type Contents struct {
 	Type         ContentsType
@@ -30,6 +33,14 @@ type Contents struct {
 	StorageClass string
 	Owner        Owner
 }
+
+type contentsSorter struct {
+	c []Contents
+}
+
+func (s *contentsSorter) Len() int           { return len(s.c) }
+func (s *contentsSorter) Swap(i, j int)      { s.c[i], s.c[j] = s.c[j], s.c[i] }
+func (s *contentsSorter) Less(i, j int) bool { return s.c[i].Key < s.c[j].Key }
 
 type ListObjectsResult struct {
 	Name        string
@@ -58,6 +69,12 @@ func openObjectsList(url string, c *Config) (io.ReadCloser, error) {
 
 }
 
+func isFolder(contents *Contents) bool {
+	return contents.Size == "0" &&
+		(strings.HasSuffix(contents.Key, folderSuffix1) ||
+			strings.HasSuffix(contents.Key, folderSuffix2))
+}
+
 func decodeListObjectsResult(reader io.ReadCloser) (*ListObjectsResult, error) {
 	defer reader.Close()
 	decoder := xml.NewDecoder(reader)
@@ -67,15 +84,24 @@ func decodeListObjectsResult(reader io.ReadCloser) (*ListObjectsResult, error) {
 		return nil, err
 	}
 
+	sorted := true
 	for i := 0; i < len(result.Contents); i++ {
 		contents := &result.Contents[i]
-		if strings.HasSuffix(contents.Key, folderSuffix) {
-			contents.Key = strings.TrimSuffix(contents.Key, folderSuffix)
+		if isFolder(contents) {
+			if strings.HasSuffix(contents.Key, folderSuffix1) {
+				contents.Key = strings.TrimSuffix(contents.Key, folderSuffix1)
+			} else if strings.HasSuffix(contents.Key, folderSuffix2) {
+				contents.Key = strings.TrimSuffix(contents.Key, folderSuffix2)
+				sorted = false
+			}
 			contents.Type = ContentsFolder
 		} else {
 			contents.Type = ContentsFile
 		}
 		contents.ETag = strings.Trim(contents.ETag, `"`)
+	}
+	if !sorted {
+		sort.Sort(&contentsSorter{result.Contents})
 	}
 	return &result, nil
 }
