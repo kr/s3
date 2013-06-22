@@ -76,7 +76,6 @@ func isFolder(contents *Contents) bool {
 }
 
 func decodeListObjectsResult(reader io.ReadCloser) (*ListObjectsResult, error) {
-	defer reader.Close()
 	decoder := xml.NewDecoder(reader)
 	result := ListObjectsResult{}
 	err := decoder.Decode(&result)
@@ -111,7 +110,7 @@ func ListObjects(url string, c *Config) (*ListObjectsResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer reader.Close()
 
-	result, err := decodeListObjectsResult(reader)
-	return result, err
+	return decodeListObjectsResult(reader)
 }
