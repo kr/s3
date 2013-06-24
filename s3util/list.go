@@ -9,24 +9,28 @@ import (
 	"time"
 )
 
-type Owner struct {
-	ID          string
-	DisplayName string
+type ListObjectsResult struct {
+	Name        string
+	Prefix      string
+	Marker      string
+	MaxKeys     string
+	IsTruncated bool
+	Contents    []Content
+}
+
+type Content struct {
+	Key          string // the original key at S3 servers
+	LastModified string
+	ETag         string // ETag value with doublequotes trimmed
+	Size         string // Note type is string. See http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGET.html
+	StorageClass string
+	Owner        Owner
 }
 
 const (
 	FolderSuffix1 = "/"
 	FolderSuffix2 = "_$folder$"
 )
-
-type Content struct {
-	Key          string // the original key at S3 servers
-	LastModified string
-	ETag         string // ETag value (doublequotes are trimmed)
-	Size         string // Note type is string. See http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGET.html
-	StorageClass string
-	Owner        Owner
-}
 
 // Returns key with folder suffix trimmed
 func (c *Content) Path() string {
@@ -45,13 +49,20 @@ func (c *Content) IsDir() bool {
 			strings.HasSuffix(c.Key, FolderSuffix2))
 }
 
-type ListObjectsResult struct {
-	Name        string
-	Prefix      string
-	Marker      string
-	MaxKeys     string
-	IsTruncated bool
-	Contents    []Content
+type Owner struct {
+	ID          string
+	DisplayName string
+}
+
+
+func ListObjects(url string, c *Config) (*ListObjectsResult, error) {
+	reader, err := openObjectsList(url, c)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	return decodeListObjectsResult(reader)
 }
 
 func openObjectsList(url string, c *Config) (io.ReadCloser, error) {
@@ -84,14 +95,4 @@ func decodeListObjectsResult(reader io.ReadCloser) (*ListObjectsResult, error) {
 		content.ETag = strings.Trim(content.ETag, `"`)
 	}
 	return &result, nil
-}
-
-func ListObjects(url string, c *Config) (*ListObjectsResult, error) {
-	reader, err := openObjectsList(url, c)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
-
-	return decodeListObjectsResult(reader)
 }
