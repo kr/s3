@@ -28,11 +28,11 @@ const (
 
 type Content struct {
 	Type         ContentsType
-	Key          string  // the original key at S3 servers
-	Path         string  // key with folder suffix trimmed
+	Key          string // the original key at S3 servers
+	Path         string // key with folder suffix trimmed
 	LastModified string
 	ETag         string
-	Size         string
+	Size         string // Note type is string. See http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGET.html
 	StorageClass string
 	Owner        Owner
 }
