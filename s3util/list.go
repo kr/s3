@@ -21,8 +21,10 @@ const (
 	ContentsFolder = "folder"
 )
 
-const folderSuffix1 = "/"
-const folderSuffix2 = "_$folder$"
+const (
+	FolderSuffix1 = "/"
+	FolderSuffix2 = "_$folder$"
+)
 
 type Contents struct {
 	Type         ContentsType
