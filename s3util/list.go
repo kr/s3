@@ -26,7 +26,8 @@ const folderSuffix2 = "_$folder$"
 
 type Contents struct {
 	Type         ContentsType
-	Key          string
+	Key          string  // the original key at S3 servers
+	Path         string  // key with folder suffix trimmed
 	LastModified string
 	ETag         string
 	Size         string
@@ -40,7 +41,7 @@ type contentsSorter struct {
 
 func (s *contentsSorter) Len() int           { return len(s.c) }
 func (s *contentsSorter) Swap(i, j int)      { s.c[i], s.c[j] = s.c[j], s.c[i] }
-func (s *contentsSorter) Less(i, j int) bool { return s.c[i].Key < s.c[j].Key }
+func (s *contentsSorter) Less(i, j int) bool { return s.c[i].Path < s.c[j].Path }
 
 type ListObjectsResult struct {
 	Name        string
@@ -71,8 +72,8 @@ func openObjectsList(url string, c *Config) (io.ReadCloser, error) {
 
 func isFolder(contents *Contents) bool {
 	return contents.Size == "0" &&
-		(strings.HasSuffix(contents.Key, folderSuffix1) ||
-			strings.HasSuffix(contents.Key, folderSuffix2))
+		(strings.HasSuffix(contents.Key, FolderSuffix1) ||
+			strings.HasSuffix(contents.Key, FolderSuffix2))
 }
 
 func decodeListObjectsResult(reader io.ReadCloser) (*ListObjectsResult, error) {
@@ -87,10 +88,10 @@ func decodeListObjectsResult(reader io.ReadCloser) (*ListObjectsResult, error) {
 	for i := 0; i < len(result.Contents); i++ {
 		contents := &result.Contents[i]
 		if isFolder(contents) {
-			if strings.HasSuffix(contents.Key, folderSuffix1) {
-				contents.Key = strings.TrimSuffix(contents.Key, folderSuffix1)
-			} else if strings.HasSuffix(contents.Key, folderSuffix2) {
-				contents.Key = strings.TrimSuffix(contents.Key, folderSuffix2)
+			if strings.HasSuffix(contents.Key, FolderSuffix1) {
+				contents.Path = strings.TrimSuffix(contents.Key, FolderSuffix1)
+			} else if strings.HasSuffix(contents.Key, FolderSuffix2) {
+				contents.Path = strings.TrimSuffix(contents.Key, FolderSuffix2)
 				sorted = false
 			}
 			contents.Type = ContentsFolder
