@@ -14,36 +14,36 @@ type Owner struct {
 	DisplayName string
 }
 
-type ContentsType string
-
-const (
-	ContentsFile   = "file"
-	ContentsFolder = "folder"
-)
-
 const (
 	FolderSuffix1 = "/"
 	FolderSuffix2 = "_$folder$"
 )
 
 type Content struct {
-	Type         ContentsType
 	Key          string // the original key at S3 servers
-	Path         string // key with folder suffix trimmed
 	LastModified string
-	ETag         string
+	ETag         string // ETag value (doublequotes are trimmed)
 	Size         string // Note type is string. See http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGET.html
 	StorageClass string
 	Owner        Owner
 }
 
-type contentsSorter struct {
-	c []Content
+// Returns key with folder suffix trimmed
+func (c *Content) Path() string {
+	if strings.HasSuffix(c.Key, FolderSuffix1) {
+		return strings.TrimSuffix(c.Key, FolderSuffix1)
+	} else if strings.HasSuffix(c.Key, FolderSuffix2) {
+		return strings.TrimSuffix(c.Key, FolderSuffix2)
+	} else {
+		return c.Key
+	}
 }
 
-func (s *contentsSorter) Len() int           { return len(s.c) }
-func (s *contentsSorter) Swap(i, j int)      { s.c[i], s.c[j] = s.c[j], s.c[i] }
-func (s *contentsSorter) Less(i, j int) bool { return s.c[i].Path < s.c[j].Path }
+func (c *Content) IsDir() bool {
+	return c.Size == "0" &&
+		(strings.HasSuffix(c.Key, FolderSuffix1) ||
+			strings.HasSuffix(c.Key, FolderSuffix2))
+}
 
 type ListObjectsResult struct {
 	Name        string
@@ -72,12 +72,6 @@ func openObjectsList(url string, c *Config) (io.ReadCloser, error) {
 
 }
 
-func isFolder(contents *Content) bool {
-	return contents.Size == "0" &&
-		(strings.HasSuffix(contents.Key, FolderSuffix1) ||
-			strings.HasSuffix(contents.Key, FolderSuffix2))
-}
-
 func decodeListObjectsResult(reader io.ReadCloser) (*ListObjectsResult, error) {
 	decoder := xml.NewDecoder(reader)
 	result := ListObjectsResult{}
@@ -86,24 +80,8 @@ func decodeListObjectsResult(reader io.ReadCloser) (*ListObjectsResult, error) {
 		return nil, err
 	}
 
-	sorted := true
-	for i := 0; i < len(result.Contents); i++ {
-		contents := &result.Contents[i]
-		if isFolder(contents) {
-			if strings.HasSuffix(contents.Key, FolderSuffix1) {
-				contents.Path = strings.TrimSuffix(contents.Key, FolderSuffix1)
-			} else if strings.HasSuffix(contents.Key, FolderSuffix2) {
-				contents.Path = strings.TrimSuffix(contents.Key, FolderSuffix2)
-				sorted = false
-			}
-			contents.Type = ContentsFolder
-		} else {
-			contents.Type = ContentsFile
-		}
-		contents.ETag = strings.Trim(contents.ETag, `"`)
-	}
-	if !sorted {
-		sort.Sort(&contentsSorter{result.Contents})
+	for _, content := range result.Contents {
+		content.ETag = strings.Trim(content.ETag, `"`)
 	}
 	return &result, nil
 }
