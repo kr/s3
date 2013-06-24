@@ -26,7 +26,7 @@ const (
 	FolderSuffix2 = "_$folder$"
 )
 
-type Contents struct {
+type Content struct {
 	Type         ContentsType
 	Key          string  // the original key at S3 servers
 	Path         string  // key with folder suffix trimmed
@@ -38,7 +38,7 @@ type Contents struct {
 }
 
 type contentsSorter struct {
-	c []Contents
+	c []Content
 }
 
 func (s *contentsSorter) Len() int           { return len(s.c) }
@@ -51,7 +51,7 @@ type ListObjectsResult struct {
 	Marker      string
 	MaxKeys     string
 	IsTruncated bool
-	Contents    []Contents
+	Contents    []Content
 }
 
 func openObjectsList(url string, c *Config) (io.ReadCloser, error) {
@@ -72,7 +72,7 @@ func openObjectsList(url string, c *Config) (io.ReadCloser, error) {
 
 }
 
-func isFolder(contents *Contents) bool {
+func isFolder(contents *Content) bool {
 	return contents.Size == "0" &&
 		(strings.HasSuffix(contents.Key, FolderSuffix1) ||
 			strings.HasSuffix(contents.Key, FolderSuffix2))
