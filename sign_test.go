@@ -167,6 +167,18 @@ var signTest = []struct {
 		"GET\n\n\nTue, 27 Mar 2007 19:36:42 +0000\n/bucket/ubuntu-12.04.2-server-amd64.iso",
 		"AWS AKIAIOSFODNN7EXAMPLE:eLAv1CJmnBwV4DXj2z508eunQQs=",
 	},
+	{
+		DefaultService,
+		"PUT",
+		"http://static.johnsmith.net:8080/db-backup.dat.gz",
+		http.Header{
+			"Date":                    {"Tue, 27 Mar 2007 21:06:08 +0000"},
+			"X-Amz-Copy-Source":       {"other_object"},
+			"X-Amz-Copy-Source-Range": {"bytes=0-960463"},
+		},
+		"PUT\n\n\nTue, 27 Mar 2007 21:06:08 +0000\nx-amz-copy-source:other_object\nx-amz-copy-source-range:bytes=0-960463\n/static.johnsmith.net/db-backup.dat.gz",
+		"AWS AKIAIOSFODNN7EXAMPLE:rH0p5yotiFsFs8BnYl9cS/MBXvk=",
+	},
 }
 
 func TestSign(t *testing.T) {

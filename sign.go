@@ -163,14 +163,19 @@ func (s *Service) writeSubResource(w io.Writer, r *http.Request) {
 }
 
 func writeAmzHeaders(w io.Writer, r *http.Request) {
-	var a []string
-	for k, v := range r.Header {
-		k = strings.ToLower(k)
-		if strings.HasPrefix(k, "x-amz-") {
-			a = append(a, k+":"+strings.Join(v, ","))
+	var keys []string
+	for k, _ := range r.Header {
+		if strings.HasPrefix(strings.ToLower(k), "x-amz-") {
+			keys = append(keys, k)
 		}
 	}
-	sort.Strings(a)
+
+	sort.Strings(keys)
+	var a []string
+	for _, k := range keys {
+		v := r.Header[k]
+		a = append(a, strings.ToLower(k)+":"+strings.Join(v, ","))
+	}
 	for _, h := range a {
 		w.Write([]byte(h))
 		w.Write([]byte{'\n'})
