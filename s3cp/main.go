@@ -21,7 +21,7 @@
 package main
 
 import (
-	"../s3util"
+	"github.com/guymguym/s3/s3util"
 	"fmt"
 	"io"
 	"os"

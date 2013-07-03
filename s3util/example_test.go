@@ -1,7 +1,7 @@
 package s3util_test
 
 import (
-	"../s3util"
+	"github.com/guymguym/s3/s3util"
 	"io"
 	"os"
 )

@@ -1,7 +1,7 @@
 package s3util
 
 import (
-	"../../s3"
+	"github.com/guymguym/s3"
 	"bytes"
 	"encoding/xml"
 	"io"
