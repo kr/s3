@@ -1,8 +1,8 @@
 package s3_test
 
 import (
+	"../s3"
 	"fmt"
-	"github.com/kr/s3"
 	"log"
 	"net/http"
 	"os"

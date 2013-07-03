@@ -1,6 +1,7 @@
 package s3util
 
 import (
+	"../../s3"
 	"io"
 	"net/http"
 	"time"
@@ -9,15 +10,15 @@ import (
 // Open requests the S3 object at url. An HTTP status other than 200 is
 // considered an error.
 //
-// If c is nil, Open uses DefaultConfig.
-func Open(url string, c *Config) (io.ReadCloser, error) {
-	if c == nil {
-		c = DefaultConfig
+// If signer is nil, Open uses DefaultConfig.
+func Open(url string, signer s3.Signer) (io.ReadCloser, error) {
+	if signer == nil {
+		signer = DefaultConfig
 	}
 	// TODO(kr): maybe parallel range fetching
 	r, _ := http.NewRequest("GET", url, nil)
 	r.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
-	c.Sign(r, *c.Keys)
+	signer.Sign(r)
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
 		return nil, err

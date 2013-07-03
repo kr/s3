@@ -1,9 +1,9 @@
 package s3util
 
 import (
+	"../../s3"
 	"bytes"
 	"encoding/xml"
-	"github.com/kr/s3"
 	"io"
 	"net/http"
 	"net/url"
@@ -36,8 +36,7 @@ type part struct {
 }
 
 type uploader struct {
-	s3       s3.Service
-	keys     s3.Keys
+	signer   s3.Signer
 	url      string
 	UploadId string // written by xml decoder
 
@@ -60,23 +59,22 @@ type uploader struct {
 // data is written.
 //
 // If h is not nil, each of its entries is added to the HTTP request header.
-// If c is nil, Create uses DefaultConfig.
-func Create(url string, h http.Header, c *Config) (io.WriteCloser, error) {
-	if c == nil {
-		c = DefaultConfig
+// If signer is nil, Create uses DefaultConfig.
+func Create(url string, h http.Header, signer s3.Signer) (io.WriteCloser, error) {
+	if signer == nil {
+		signer = DefaultConfig
 	}
-	return newUploader(url, h, c)
+	return newUploader(url, h, signer)
 }
 
 // Sends an S3 multipart upload initiation request.
 // See http://docs.amazonwebservices.com/AmazonS3/latest/dev/mpuoverview.html.
 // This initial request returns an UploadId that we use to identify
 // subsequent PUT requests.
-func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) {
+func newUploader(url string, h http.Header, signer s3.Signer) (u *uploader, err error) {
 	u = new(uploader)
-	u.s3 = *c.Service
+	u.signer = signer
 	u.url = url
-	u.keys = *c.Keys
 	u.bufsz = minPartSize
 	r, err := http.NewRequest("POST", url+"?uploads", nil)
 	if err != nil {
@@ -88,7 +86,7 @@ func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) 
 			r.Header.Add(k, v)
 		}
 	}
-	u.s3.Sign(r, u.keys)
+	u.signer.Sign(r)
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
 		return nil, err
@@ -174,7 +172,7 @@ func (u *uploader) putPart(p *part) error {
 	}
 	req.ContentLength = p.len
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
-	u.s3.Sign(req, u.keys)
+	u.signer.Sign(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -214,7 +212,7 @@ func (u *uploader) Close() error {
 		return err
 	}
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
-	u.s3.Sign(req, u.keys)
+	u.signer.Sign(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -237,7 +235,7 @@ func (u *uploader) abort() {
 		return
 	}
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
-	u.s3.Sign(req, u.keys)
+	u.signer.Sign(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return

@@ -39,6 +39,12 @@ var signParams = map[string]bool{
 	"website":                      true,
 }
 
+// The Signer interface describes a sign-able entity.
+// Implemented by s3util.Config for signing with known keys.
+type Signer interface {
+	Sign(r *http.Request)
+}
+
 // Keys holds a set of Amazon Security Credentials.
 type Keys struct {
 	AccessKey string

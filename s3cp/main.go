@@ -21,8 +21,8 @@
 package main
 
 import (
+	"../s3util"
 	"fmt"
-	"github.com/kr/s3/s3util"
 	"io"
 	"os"
 	"strings"

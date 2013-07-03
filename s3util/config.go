@@ -11,7 +11,8 @@ package s3util
 // TODO(kr): parse error responses; return structured data
 
 import (
-	"github.com/kr/s3"
+	"../../s3"
+	"net/http"
 )
 
 var DefaultConfig = &Config{
@@ -23,3 +24,9 @@ type Config struct {
 	*s3.Service
 	*s3.Keys
 }
+
+// Implement the s3.Signer interface
+func (c *Config) Sign(r *http.Request) {
+	c.Service.Sign(r, *c.Keys)
+}
+
