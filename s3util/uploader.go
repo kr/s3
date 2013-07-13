@@ -184,6 +184,7 @@ func (u *uploader) putPart(p *part) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return newRespError(resp)
 	}
