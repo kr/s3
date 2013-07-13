@@ -12,6 +12,7 @@ package s3util
 
 import (
 	"github.com/kr/s3"
+	"net/http"
 )
 
 var DefaultConfig = &Config{
@@ -22,4 +23,5 @@ var DefaultConfig = &Config{
 type Config struct {
 	*s3.Service
 	*s3.Keys
+	*http.Client // if nil, uses http.DefaultClient
 }

@@ -18,7 +18,11 @@ func Open(url string, c *Config) (io.ReadCloser, error) {
 	r, _ := http.NewRequest("GET", url, nil)
 	r.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	c.Sign(r, *c.Keys)
-	resp, err := http.DefaultClient.Do(r)
+	client := c.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(r)
 	if err != nil {
 		return nil, err
 	}

@@ -39,6 +39,7 @@ type uploader struct {
 	s3       s3.Service
 	keys     s3.Keys
 	url      string
+	client   *http.Client
 	UploadId string // written by xml decoder
 
 	bufsz  int64
@@ -77,6 +78,10 @@ func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) 
 	u.s3 = *c.Service
 	u.url = url
 	u.keys = *c.Keys
+	u.client = c.Client
+	if u.client == nil {
+		u.client = http.DefaultClient
+	}
 	u.bufsz = minPartSize
 	r, err := http.NewRequest("POST", url+"?uploads", nil)
 	if err != nil {
@@ -89,7 +94,7 @@ func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) 
 		}
 	}
 	u.s3.Sign(r, u.keys)
-	resp, err := http.DefaultClient.Do(r)
+	resp, err := u.client.Do(r)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +180,7 @@ func (u *uploader) putPart(p *part) error {
 	req.ContentLength = p.len
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	u.s3.Sign(req, u.keys)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := u.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -215,7 +220,7 @@ func (u *uploader) Close() error {
 	}
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	u.s3.Sign(req, u.keys)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := u.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -238,7 +243,7 @@ func (u *uploader) abort() {
 	}
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	u.s3.Sign(req, u.keys)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := u.client.Do(req)
 	if err != nil {
 		return
 	}
