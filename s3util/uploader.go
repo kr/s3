@@ -156,6 +156,7 @@ func (u *uploader) worker() {
 // Calls putPart up to nTry times to recover from transient errors.
 func (u *uploader) retryUploadPart(p *part) {
 	defer u.wg.Done()
+	defer func() { p.r = nil }() // free the large buffer
 	var err error
 	for i := 0; i < nTry; i++ {
 		p.r.Seek(0, 0)

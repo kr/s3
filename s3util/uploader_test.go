@@ -2,18 +2,17 @@ package s3util
 
 import (
 	"io"
+	"io/ioutil"
 	"net/http"
+	"runtime"
 	"strings"
 	"testing"
 )
 
-func TestUploaderCloseRespBody(t *testing.T) {
-	want := make(chan int, 100)
-	got := make(closeCounter, 100)
+func runUpload(t *testing.T, makeCloser func(io.Reader) io.ReadCloser) *uploader {
 	c := *DefaultConfig
 	c.Client = &http.Client{
 		Transport: RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
-			want <- 1
 			var s string
 			switch q := req.URL.Query(); {
 			case req.Method == "PUT":
@@ -25,7 +24,7 @@ func TestUploaderCloseRespBody(t *testing.T) {
 			}
 			resp := &http.Response{
 				StatusCode: 200,
-				Body:       readClose{strings.NewReader(s), got},
+				Body:       makeCloser(strings.NewReader(s)),
 				Header: http.Header{
 					"Etag": {`"foo"`},
 				},
@@ -49,8 +48,43 @@ func TestUploaderCloseRespBody(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected err", err)
 	}
+	return u
+}
+
+func TestUploaderCloseRespBody(t *testing.T) {
+	want := make(chan int, 100)
+	got := make(closeCounter, 100)
+	f := func(r io.Reader) io.ReadCloser {
+		want <- 1
+		return readClose{r, got}
+	}
+	runUpload(t, f)
 	if len(want) != len(got) {
 		t.Errorf("closes = %d want %d", len(got), len(want))
+	}
+}
+
+// Used in TestUploaderFreesBuffers to force liveness.
+var DummyUploader *uploader
+
+func TestUploaderFreesBuffers(t *testing.T) {
+	var m0, m1 runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&m0)
+	u := runUpload(t, ioutil.NopCloser)
+	runtime.GC()
+	runtime.ReadMemStats(&m1)
+
+	// Make sure everything reachable from u is still live while reading m1.
+	// (Very aggressive cross-package optimization could hypothetically
+	// break this, rendering the test ineffective.)
+	DummyUploader = u
+
+	// The uploader never allocates buffers smaller than minPartSize,
+	// so if the increase is < minPartSize we know none are reachable.
+	inc := m1.Alloc - m0.Alloc
+	if m1.Alloc > m0.Alloc && inc >= minPartSize {
+		t.Errorf("inc = %d want <%d", inc, minPartSize)
 	}
 }
 
