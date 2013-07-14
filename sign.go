@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 )
 
 var signParams = map[string]bool{
@@ -71,6 +72,10 @@ func Sign(r *http.Request, k Keys) {
 	DefaultService.Sign(r, k)
 }
 
+func SignURL(r *http.Request, t time.Time, k Keys) {
+	DefaultService.SignURL(r, t, k)
+}
+
 // Service represents an S3-compatible service.
 type Service struct {
 	Domain string                        // service root domain, used to extract subdomain from an http.Request and pass it to Bucket
@@ -89,6 +94,17 @@ func (s *Service) Sign(r *http.Request, k Keys) {
 	r.Header.Set("Authorization", "AWS "+k.AccessKey+":"+string(sig))
 }
 
+func (s *Service) SignURL(r *http.Request, t time.Time, k Keys) {
+	if k.SecurityToken != "" {
+		r.Header.Set("X-Amz-Security-Token", k.SecurityToken)
+	}
+	h := hmac.New(sha1.New, []byte(k.SecretKey))
+	s.writeSigURLData(h, r, t)
+	sig := make([]byte, base64.StdEncoding.EncodedLen(h.Size()))
+	base64.StdEncoding.Encode(sig, h.Sum(nil))
+	r.URL.RawQuery = "AWSAccessKeyId="+k.AccessKey+"&Signature="+string(sig)+"&Expires="+string(t.Unix())
+}
+
 func (s *Service) writeSigData(w io.Writer, r *http.Request) {
 	w.Write([]byte(r.Method))
 	w.Write([]byte{'\n'})
@@ -99,6 +115,19 @@ func (s *Service) writeSigData(w io.Writer, r *http.Request) {
 	if _, ok := r.Header["X-Amz-Date"]; !ok {
 		w.Write([]byte(r.Header.Get("date")))
 	}
+	w.Write([]byte{'\n'})
+	writeAmzHeaders(w, r)
+	s.writeResource(w, r)
+}
+
+func (s *Service) writeSigURLData(w io.Writer, r *http.Request, t time.Time) {
+	w.Write([]byte(r.Method))
+	w.Write([]byte{'\n'})
+	w.Write([]byte(r.Header.Get("content-md5")))
+	w.Write([]byte{'\n'})
+	w.Write([]byte(r.Header.Get("content-type")))
+	w.Write([]byte{'\n'})
+	w.Write([]byte(string(t.Unix())))
 	w.Write([]byte{'\n'})
 	writeAmzHeaders(w, r)
 	s.writeResource(w, r)
