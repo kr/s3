@@ -63,6 +63,7 @@ func IdentityBucket(subdomain string) string {
 // It is designed to be used with the Amazon service.
 //   "johnsmith.s3"           becomes "johnsmith"
 //   "johnsmith.s3-eu-west-1" becomes "johnsmith"
+//   "www.example.com.s3"     becomes "www.example.com"
 func AmazonBucket(subdomain string) string {
 	s := strings.Split(subdomain, ".")
 	return strings.Join(s[:len(s)-1], ".")
