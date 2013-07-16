@@ -1,8 +1,8 @@
 // Package s3 signs HTTP requests for Amazon S3 and compatible services.
-//
+package s3
+
 // See
 // http://docs.amazonwebservices.com/AmazonS3/2006-03-01/dev/RESTAuthentication.html.
-package s3
 
 import (
 	"crypto/hmac"
@@ -43,38 +43,51 @@ var signParams = map[string]bool{
 type Keys struct {
 	AccessKey string
 	SecretKey string
-	// Used for temporary security credentials. Leave blank to use
-	// standard AWS Account or IAM credentials.
-	// See http://docs.aws.amazon.com/AmazonS3/latest/dev/MakingRequests.html#TypesofSecurityCredentials
+
+	// SecurityToken is used for temporary security credentials.
+	// If set, it will be added to header field X-Amz-Security-Token
+	// before signing a request.
 	SecurityToken string
+	// See http://docs.aws.amazon.com/AmazonS3/latest/dev/MakingRequests.html#TypesofSecurityCredentials
 }
 
-// IdentityBucket returns subdomain as-is.
+// IdentityBucket returns subdomain.
+// It is designed to be used with S3-compatible services that
+// treat the entire subdomain as the bucket name, for example
+// storage.io.
 func IdentityBucket(subdomain string) string {
 	return subdomain
 }
 
-// AmazonBucket returns up to last section of subdomain.
-// Intended to be used with Amazon S3 service: "johnsmith.s3-eu-west-1" => "johnsmith".
+// AmazonBucket returns everything up to the last '.' in subdomain.
+// It is designed to be used with the Amazon service.
+//   "johnsmith.s3"           becomes "johnsmith"
+//   "johnsmith.s3-eu-west-1" becomes "johnsmith"
 func AmazonBucket(subdomain string) string {
 	s := strings.Split(subdomain, ".")
 	return strings.Join(s[:len(s)-1], ".")
 }
 
-// The default Service used by Sign.
+// DefaultService is the default Service used by Sign.
 var DefaultService = &Service{Domain: "amazonaws.com"}
 
 // Sign signs an HTTP request with the given S3 keys.
 //
-// This function is shorthand for DefaultService.Sign(r, k).
+// This function is a wrapper around DefaultService.Sign.
 func Sign(r *http.Request, k Keys) {
 	DefaultService.Sign(r, k)
 }
 
 // Service represents an S3-compatible service.
 type Service struct {
-	Domain string                        // service root domain, used to extract subdomain from an http.Request and pass it to Bucket
-	Bucket func(subdomain string) string // function used to derive a bucket name from subdomain; if nil, AmazonBucket is used
+	// Domain is the service's root domain. It is used to extract
+	// the subdomain from an http.Request before passing the
+	// subdomain to Bucket.
+	Domain string
+
+	// Bucket derives the bucket name from a subdomain.
+	// If nil, AmazonBucket is used.
+	Bucket func(subdomain string) string
 }
 
 // Sign signs an HTTP request with the given S3 keys for use on service s.
