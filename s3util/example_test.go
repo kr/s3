@@ -1,6 +1,7 @@
 package s3util_test
 
 import (
+	"fmt"
 	"github.com/kr/s3/s3util"
 	"io"
 	"os"
@@ -22,4 +23,30 @@ func ExampleOpen() {
 	w, _ := os.Create("out.txt")
 	io.Copy(w, r)
 	w.Close()
+}
+
+func ExampleReaddir() {
+	s3util.DefaultConfig.AccessKey = os.Getenv("S3_ACCESS_KEY")
+	s3util.DefaultConfig.SecretKey = os.Getenv("S3_SECRET_KEY")
+	f, err := s3util.NewFile("https://examle.s3.amazonaws.com/foo", nil)
+	if err != nil {
+		panic(err)
+	}
+	var infos []os.FileInfo
+	for {
+		infos, err = f.Readdir(0)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			panic(err)
+		}
+		for i, info := range infos {
+			c := info.Sys().(*s3util.Stat)
+			var etag string
+			if c != nil {
+				etag = c.ETag
+			}
+			fmt.Printf("%d: %v, %s\n", i, info, etag)
+		}
+	}
 }
