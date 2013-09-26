@@ -148,6 +148,20 @@ var signTest = []struct {
 		"AWS AKIAIOSFODNN7EXAMPLE:DXGmXMY+1QnRGC7vicUqu1gTmK4=",
 	},
 	{
+		DefaultService,
+		"POST",
+		// object?restore is required in CanonicalizedResource for:
+		// http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPOSTrestore.html
+		"http://bucketname.S3.amazonaws.com/photo1.jpg?restore",
+		http.Header{
+			"x-amz-date":     {"Mon, 22 Oct 2012 01:49:52 GMT"},
+			"Content-MD5":    {"p5/WA/oEr30qrEEl21PAqw=="},
+			"Content-Length": {"125"},
+		},
+		"POST\np5/WA/oEr30qrEEl21PAqw==\n\n\nx-amz-date:Mon, 22 Oct 2012 01:49:52 GMT\n/bucketname/photo1.jpg?restore",
+		"AWS AKIAIOSFODNN7EXAMPLE:Yuldf0uSoOutFCGMkKYQzxVYeDk=",
+	},
+	{
 		StorageIOService,
 		"GET",
 		"http://bucket.storage.io/ubuntu-12.04.2-server-amd64.iso",
