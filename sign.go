@@ -30,6 +30,7 @@ var signParams = map[string]bool{
 	"response-content-language":    true,
 	"response-content-type":        true,
 	"response-expires":             true,
+	"restore":                      true,
 	"torrent":                      true,
 	"uploadId":                     true,
 	"uploads":                      true,
