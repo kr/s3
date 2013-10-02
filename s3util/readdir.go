@@ -14,7 +14,7 @@ import (
 )
 
 // File represents a remote folder (directory), it is created with NewFile()
-// and used to call List() to get file and directory entries in it.
+// and used to call Readdir() to get file and directory entries in it.
 type File struct {
 	url    string
 	prefix string
@@ -32,7 +32,7 @@ type fileInfo struct {
 
 // Stat contains info of a remote file/directory.
 // You can get one by fi.Sys().(*s3util.Stat) for each FileInfo fi of
-// []FileInfo returned by List().
+// []FileInfo returned by Readdir().
 type Stat struct {
 	Key          string // the original key at S3 servers
 	LastModified string
@@ -67,7 +67,7 @@ func (f *fileInfo) ModTime() time.Time {
 func (f *fileInfo) IsDir() bool      { return f.dir }
 func (f *fileInfo) Sys() interface{} { return f.sys }
 
-// Create a File which represents a remote folder. It is used to call List()
+// Create a File which represents a remote folder. It is used to call Readdir()
 // to get file and directory entries in it.
 // Set rawurl to a remote folder
 // (ex. https://your_backet.s3.amazonaws.com/your_folder).
@@ -95,15 +95,15 @@ func NewFile(rawurl string, c *Config) (*File, error) {
 
 // Get a file/directory entries in a remote folder specified by a File.
 // Only direct children are returned, not descendants.
-// You can limit the count of entries with n. n must be smaller than or
-// equal to 1000. If you set n to a number greater than 1000, it is still
+// You can limit the count of entries with count. count must be smaller than or
+// equal to 1000. If you set count to a number greater than 1000, it is still
 // treated as 1000 by the amazon S3 servers.
-func (f *File) List(n int) ([]os.FileInfo, error) {
+func (f *File) Readdir(count int) ([]os.FileInfo, error) {
 	if f.result != nil && !f.result.IsTruncated {
 		return make([]os.FileInfo, 0), io.EOF
 	}
 
-	reader, err := f.sendRequest(n)
+	reader, err := f.sendRequest(count)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (f *File) List(n int) ([]os.FileInfo, error) {
 	return f.parseResponse(reader)
 }
 
-func (f *File) sendRequest(n int) (io.ReadCloser, error) {
+func (f *File) sendRequest(count int) (io.ReadCloser, error) {
 	c := f.config
 	if c == nil {
 		c = DefaultConfig
@@ -124,9 +124,9 @@ func (f *File) sendRequest(n int) (io.ReadCloser, error) {
 		buf.WriteString("&prefix=")
 		buf.WriteString(url.QueryEscape(f.prefix))
 	}
-	if n > 0 {
+	if count > 0 {
 		buf.WriteString("&max-keys=")
-		buf.WriteString(strconv.Itoa(n))
+		buf.WriteString(strconv.Itoa(count))
 	}
 	if f.result != nil && f.result.IsTruncated {
 		var lastDir, lastKey, marker string

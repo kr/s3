@@ -25,7 +25,7 @@ func ExampleOpen() {
 	w.Close()
 }
 
-func ExampleList() {
+func ExampleReaddir() {
 	s3util.DefaultConfig.AccessKey = os.Getenv("S3_ACCESS_KEY")
 	s3util.DefaultConfig.SecretKey = os.Getenv("S3_SECRET_KEY")
 	f, err := s3util.NewFile("https://examle.s3.amazonaws.com/foo", nil)
@@ -34,7 +34,7 @@ func ExampleList() {
 	}
 	var infos []os.FileInfo
 	for {
-		infos, err = f.List(0)
+		infos, err = f.Readdir(0)
 		if err == io.EOF {
 			break
 		} else if err != nil {
