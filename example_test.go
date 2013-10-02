@@ -47,7 +47,7 @@ func ExampleList() {
 			panic(err)
 		}
 		for i, info := range infos {
-			c := info.Sys().(*s3util.Content_t)
+			c := info.Sys().(*s3util.Stat)
 			var etag string
 			if c != nil {
 				etag = c.ETag

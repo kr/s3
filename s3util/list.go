@@ -25,10 +25,10 @@ type fileInfo struct {
 	size    int64
 	dir     bool
 	modTime time.Time
-	sys     *Content_t
+	sys     *Stat
 }
 
-type Content_t struct {
+type Stat struct {
 	Key          string // the original key at S3 servers
 	LastModified string
 	ETag         string // ETag value with doublequotes trimmed
@@ -40,7 +40,7 @@ type Content_t struct {
 
 type listObjectsResult struct {
 	IsTruncated bool
-	Contents    []Content_t
+	Contents    []Stat
 	Directories []string `xml:"CommonPrefixes>Prefix"` // Suffix "/" trimmed
 }
 
