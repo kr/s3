@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+// File represents a remote folder (directory), it is created with NewFile()
+// and used to call List() to get file and directory entries in it.
 type File struct {
 	url    string
 	prefix string
@@ -28,6 +30,9 @@ type fileInfo struct {
 	sys     *Stat
 }
 
+// Stat contains info of a remote file/directory.
+// You can get one by fi.Sys().(*s3util.Stat) for each FileInfo fi of
+// []FileInfo returned by List().
 type Stat struct {
 	Key          string // the original key at S3 servers
 	LastModified string
@@ -62,6 +67,12 @@ func (f *fileInfo) ModTime() time.Time {
 func (f *fileInfo) IsDir() bool      { return f.dir }
 func (f *fileInfo) Sys() interface{} { return f.sys }
 
+// Create a File which represents a remote folder. It is used to call List()
+// to get file and directory entries in it.
+// Set rawurl to a remote folder
+// (ex. https://your_backet.s3.amazonaws.com/your_folder).
+// rawurl cannot have query parameters or fragment (#foo).
+// If c is nil, DefaultConfig will be used.
 func NewFile(rawurl string, c *Config) (*File, error) {
 	u, err := url.Parse(rawurl)
 	if err != nil {
@@ -82,6 +93,11 @@ func NewFile(rawurl string, c *Config) (*File, error) {
 	return &File{u.String(), prefix, c, nil}, nil
 }
 
+// Get a file/directory entries in a remote folder specified by a File.
+// Only direct children are returned, not descendants.
+// You can limit the count of entries with n. n must be smaller than or
+// equal to 1000. If you set n to a number greater than 1000, it is still
+// treated as 1000 by the amazon S3 servers.
 func (f *File) List(n int) ([]os.FileInfo, error) {
 	if f.result != nil && !f.result.IsTruncated {
 		return make([]os.FileInfo, 0), io.EOF
