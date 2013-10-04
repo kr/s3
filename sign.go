@@ -65,8 +65,10 @@ func IdentityBucket(subdomain string) string {
 //   "johnsmith.s3-eu-west-1" becomes "johnsmith"
 //   "www.example.com.s3"     becomes "www.example.com"
 func AmazonBucket(subdomain string) string {
-	s := strings.Split(subdomain, ".")
-	return strings.Join(s[:len(s)-1], ".")
+	if i := strings.LastIndex(subdomain, "."); i != -1 {
+		return subdomain[:i]
+	}
+	return ""
 }
 
 // DefaultService is the default Service used by Sign.
