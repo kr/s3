@@ -210,8 +210,7 @@ func (u *Uploader) Pause() (*UploaderState, error) {
 	// We can't flush parts less than the min size, so we have to persist them.
 	var buf []byte
 	if u.off > 0 && u.off < MinPartSize {
-		buf = make([]byte, u.off)
-		copy(buf, u.buf)
+		buf = u.buf[:u.off]
 		u.buf, u.off = nil, 0
 	}
 
