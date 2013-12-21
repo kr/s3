@@ -1,4 +1,8 @@
 Package s3util provides streaming transfers to and from Amazon S3.
 
+This branch offers Pause/Resume methods so a multipart upload may be stopped,
+its state persisted, and then loaded later (perhaps in a completely new
+process).
+
 Full documentation:
 http://godoc.org/github.com/kr/s3/s3util
