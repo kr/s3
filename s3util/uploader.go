@@ -15,10 +15,10 @@ import (
 
 // defined by amazon
 const (
-	minPartSize = 5 * 1024 * 1024
-	maxPartSize = 1<<31 - 1 // for 32-bit use; amz max is 5GiB
-	maxObjSize  = 5 * 1024 * 1024 * 1024 * 1024
-	maxNPart    = 10000
+	MinPartSize = 5 * 1024 * 1024
+	MaxPartSize = 1<<31 - 1 // for 32-bit use; amz max is 5GiB
+	MaxObjSize  = 5 * 1024 * 1024 * 1024 * 1024
+	MaxNPart    = 10000
 )
 
 const (
@@ -35,7 +35,7 @@ type part struct {
 	ETag       string
 }
 
-type uploader struct {
+type Uploader struct {
 	s3       s3.Service
 	keys     s3.Keys
 	url      string
@@ -57,32 +57,27 @@ type uploader struct {
 	}
 }
 
+// Marshalable subset of uploader for persisting and resuming later.
+type UploaderState struct {
+	Buffer   []byte // if buf < MinPartSize, we need to persist it
+	Url      string
+	UploadId string
+	Part     int
+	Parts    []*part
+}
+
 // Create creates an S3 object at url and sends multipart upload requests as
 // data is written.
 //
+// See http://docs.amazonwebservices.com/AmazonS3/latest/dev/mpuoverview.html.
+//
 // If h is not nil, each of its entries is added to the HTTP request header.
 // If c is nil, Create uses DefaultConfig.
-func Create(url string, h http.Header, c *Config) (io.WriteCloser, error) {
+func Create(url string, h http.Header, c *Config) (*Uploader, error) {
 	if c == nil {
 		c = DefaultConfig
 	}
-	return newUploader(url, h, c)
-}
-
-// Sends an S3 multipart upload initiation request.
-// See http://docs.amazonwebservices.com/AmazonS3/latest/dev/mpuoverview.html.
-// This initial request returns an UploadId that we use to identify
-// subsequent PUT requests.
-func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) {
-	u = new(uploader)
-	u.s3 = *c.Service
-	u.url = url
-	u.keys = *c.Keys
-	u.client = c.Client
-	if u.client == nil {
-		u.client = http.DefaultClient
-	}
-	u.bufsz = minPartSize
+	u := newUploader(url, c)
 	r, err := http.NewRequest("POST", url+"?uploads", nil)
 	if err != nil {
 		return nil, err
@@ -106,14 +101,28 @@ func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) 
 	if err != nil {
 		return nil, err
 	}
+	return u, nil
+}
+
+// Initializes an Uploader but does not initiate the S3 multipart upload.
+func newUploader(url string, c *Config) *Uploader {
+	u := new(Uploader)
+	u.s3 = *c.Service
+	u.url = url
+	u.keys = *c.Keys
+	u.client = c.Client
+	if u.client == nil {
+		u.client = http.DefaultClient
+	}
+	u.bufsz = MinPartSize
 	u.ch = make(chan *part)
 	for i := 0; i < concurrency; i++ {
 		go u.worker()
 	}
-	return u, nil
+	return u
 }
 
-func (u *uploader) Write(p []byte) (n int, err error) {
+func (u *Uploader) Write(p []byte) (n int, err error) {
 	if u.closed {
 		return 0, syscall.EINVAL
 	}
@@ -126,7 +135,7 @@ func (u *uploader) Write(p []byte) (n int, err error) {
 			// Increase part size (1.001x).
 			// This lets us reach the max object size (5TiB) while
 			// still doing minimal buffering for small objects.
-			u.bufsz = min(u.bufsz+u.bufsz/1000, maxPartSize)
+			u.bufsz = min(u.bufsz+u.bufsz/1000, MaxPartSize)
 		}
 		r := copy(u.buf[u.off:], p[n:])
 		u.off += r
@@ -138,7 +147,7 @@ func (u *uploader) Write(p []byte) (n int, err error) {
 	return n, nil
 }
 
-func (u *uploader) flush() {
+func (u *Uploader) flush() {
 	u.wg.Add(1)
 	u.part++
 	p := &part{bytes.NewReader(u.buf[:u.off]), int64(u.off), u.part, ""}
@@ -147,14 +156,14 @@ func (u *uploader) flush() {
 	u.buf, u.off = nil, 0
 }
 
-func (u *uploader) worker() {
+func (u *Uploader) worker() {
 	for p := range u.ch {
 		u.retryUploadPart(p)
 	}
 }
 
 // Calls putPart up to nTry times to recover from transient errors.
-func (u *uploader) retryUploadPart(p *part) {
+func (u *Uploader) retryUploadPart(p *part) {
 	defer u.wg.Done()
 	defer func() { p.r = nil }() // free the large buffer
 	var err error
@@ -170,7 +179,7 @@ func (u *uploader) retryUploadPart(p *part) {
 
 // Uploads part p, reading its contents from p.r.
 // Stores the ETag in p.ETag.
-func (u *uploader) putPart(p *part) error {
+func (u *Uploader) putPart(p *part) error {
 	v := url.Values{}
 	v.Set("partNumber", strconv.Itoa(p.PartNumber))
 	v.Set("uploadId", u.UploadId)
@@ -194,7 +203,50 @@ func (u *uploader) putPart(p *part) error {
 	return nil
 }
 
-func (u *uploader) Close() error {
+// Flushes uploads, closes the uploader, and returns the current state for
+// Resume()ing later. Note that Resume() requires the *Config as it is not
+// included in *UploaderState.
+func (u *Uploader) Pause() (*UploaderState, error) {
+	// We can't flush parts less than the min size, so we have to persist them.
+	var buf []byte
+	if u.off > 0 && u.off < MinPartSize {
+		buf = make([]byte, u.off)
+		copy(buf, u.buf)
+		u.buf, u.off = nil, 0
+	}
+
+	if err := u.shutdown(); err != nil {
+		return nil, err
+	}
+
+	return &UploaderState{
+		Part:     u.part,
+		Parts:    u.xml.Part,
+		Url:      u.url,
+		UploadId: u.UploadId,
+		Buffer:   buf,
+	}, nil
+}
+
+// Resume returns an Uploader at the given state with a new config.
+//
+// Config must be included because it contains senstive keys callers may want
+// to persist separately and an optional http.Client which cannot be persisted.
+func Resume(state *UploaderState, c *Config) *Uploader {
+	u := newUploader(state.Url, c)
+	u.UploadId = state.UploadId
+	u.part = state.Part
+	u.xml.Part = state.Parts
+
+	// Load buffer and set size (offset)
+	u.buf = make([]byte, int(u.bufsz))
+	copy(u.buf, state.Buffer)
+	u.off = len(state.Buffer)
+	return u
+}
+
+// Flushes buffer and closes connection but does not commit S3 upload.
+func (u *Uploader) shutdown() error {
 	if u.closed {
 		return syscall.EINVAL
 	}
@@ -208,7 +260,17 @@ func (u *uploader) Close() error {
 		u.abort()
 		return u.err
 	}
+	return nil
+}
 
+// Close flushes and commits the multipart upload. Calling more than once will
+// return syscall.EINVAL.
+func (u *Uploader) Close() error {
+	if err := u.shutdown(); err != nil {
+		return err
+	}
+
+	// Commit the upload
 	body, err := xml.Marshal(u.xml)
 	if err != nil {
 		return err
@@ -233,7 +295,7 @@ func (u *uploader) Close() error {
 	return nil
 }
 
-func (u *uploader) abort() {
+func (u *Uploader) abort() {
 	// TODO(kr): devise a reasonable way to report an error here in addition
 	// to the error that caused the abort.
 	v := url.Values{}
