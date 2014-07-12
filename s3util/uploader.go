@@ -57,6 +57,21 @@ type uploader struct {
 	}
 }
 
+type UploadMetrics struct {
+	TotalBytes uint64
+	TotalTime  time.Duration
+}
+
+var (
+	uploadMetricsHook func(UploadMetrics)
+)
+
+// Set metrics callback. Will receive an UploadMetrics instance for
+// each part uploaded.
+func SetUploadMetricsCallback(f func(UploadMetrics)) {
+	uploadMetricsHook = f
+}
+
 // Create creates an S3 object at url and sends multipart upload requests as
 // data is written.
 //
@@ -181,7 +196,9 @@ func (u *uploader) putPart(p *part) error {
 	req.ContentLength = p.len
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	u.s3.Sign(req, u.keys)
+	start := time.Now()
 	resp, err := u.client.Do(req)
+	end := time.Now()
 	if err != nil {
 		return err
 	}
@@ -189,6 +206,15 @@ func (u *uploader) putPart(p *part) error {
 	if resp.StatusCode != 200 {
 		return newRespError(resp)
 	}
+
+	if uploadMetricsHook != nil {
+		uploadMetricsHook(
+			UploadMetrics{
+				TotalBytes: uint64(p.len),
+				TotalTime:  end.Sub(start),
+			})
+	}
+
 	s := resp.Header.Get("etag") // includes quote chars for some reason
 	p.ETag = s[1 : len(s)-1]
 	return nil
