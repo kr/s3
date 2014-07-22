@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func runUpload(t *testing.T, makeCloser func(io.Reader) io.ReadCloser) *uploader {
+func runUpload(t *testing.T, makeCloser func(io.Reader) io.ReadCloser) *Uploader {
 	c := *DefaultConfig
 	c.Client = &http.Client{
 		Transport: RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -65,7 +65,7 @@ func TestUploaderCloseRespBody(t *testing.T) {
 }
 
 // Used in TestUploaderFreesBuffers to force liveness.
-var DummyUploader *uploader
+var DummyUploader *Uploader
 
 func TestUploaderFreesBuffers(t *testing.T) {
 	var m0, m1 runtime.MemStats
