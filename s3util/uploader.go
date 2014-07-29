@@ -220,7 +220,7 @@ func (u *Uploader) putPart(p *part) error {
 	return nil
 }
 
-func (u *Uploader) Close() error {
+func (u *Uploader) prepareClose() error {
 	if u.closed {
 		return syscall.EINVAL
 	}
@@ -234,7 +234,13 @@ func (u *Uploader) Close() error {
 		u.abort()
 		return u.Err
 	}
+	return nil
+}
 
+func (u *Uploader) Close() error {
+	if err := u.prepareClose(); err != nil {
+		return err
+	}
 	body, err := xml.Marshal(u.xml)
 	if err != nil {
 		return err
@@ -242,21 +248,29 @@ func (u *Uploader) Close() error {
 	b := bytes.NewBuffer(body)
 	v := url.Values{}
 	v.Set("uploadId", u.UploadId)
-	req, err := http.NewRequest("POST", u.url+"?"+v.Encode(), b)
-	if err != nil {
-		return err
+
+	var finalError error
+	for retries := 0; retries < 3; retries++ {
+		req, err := http.NewRequest("POST", u.url+"?"+v.Encode(), b)
+		if err != nil {
+			finalError = err
+			continue
+		}
+		req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+		u.s3.Sign(req, u.keys)
+		resp, err := u.client.Do(req)
+		if err != nil {
+			finalError = err
+			continue
+		}
+		if resp.StatusCode != 200 {
+			finalError = newRespError(resp)
+			continue
+		}
+		resp.Body.Close()
+		return nil
 	}
-	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
-	u.s3.Sign(req, u.keys)
-	resp, err := u.client.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 200 {
-		return newRespError(resp)
-	}
-	resp.Body.Close()
-	return nil
+	return finalError
 }
 
 func (u *Uploader) abort() {
