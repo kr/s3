@@ -249,13 +249,13 @@ func (u *Uploader) Close() error {
 	v := url.Values{}
 	v.Set("uploadId", u.UploadId)
 
+	req, err := http.NewRequest("POST", u.url+"?"+v.Encode(), b)
+	if err != nil {
+		return err
+	}
+
 	var finalError error
 	for retries := 0; retries < 3; retries++ {
-		req, err := http.NewRequest("POST", u.url+"?"+v.Encode(), b)
-		if err != nil {
-			finalError = err
-			continue
-		}
 		req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 		u.s3.Sign(req, u.keys)
 		resp, err := u.client.Do(req)
