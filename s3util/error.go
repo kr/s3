@@ -27,3 +27,7 @@ func (e *respError) Error() string {
 		e.b.String(),
 	)
 }
+
+func (e *respError) StatusCode() int {
+	return e.r.StatusCode
+}
