@@ -31,3 +31,12 @@ func (e *respError) Error() string {
 func (e *respError) StatusCode() int {
 	return e.r.StatusCode
 }
+
+func GetRespCode(e error) int {
+	err, ok := e.(*respError)
+	if !ok {
+		return 0
+	}
+
+	return err.StatusCode()
+}
