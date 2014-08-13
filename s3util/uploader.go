@@ -42,34 +42,20 @@ type Uploader struct {
 	client   *http.Client
 	UploadId string // written by xml decoder
 
-	bufsz  int64
-	buf    []byte
-	off    int
-	ch     chan *part
-	part   int
-	closed bool
-	Err    error
-	wg     sync.WaitGroup
+	bufsz           int64
+	buf             []byte
+	off             int
+	ch              chan *part
+	part            int
+	closed          bool
+	Err             error
+	wg              sync.WaitGroup
+	metricsCallback UploadMetricsCallbackFunc
 
 	xml struct {
 		XMLName string `xml:"CompleteMultipartUpload"`
 		Part    []*part
 	}
-}
-
-type UploadMetrics struct {
-	TotalBytes uint64
-	TotalTime  time.Duration
-}
-
-var (
-	uploadMetricsHook func(UploadMetrics)
-)
-
-// Set metrics callback. Will receive an UploadMetrics instance for
-// each part uploaded.
-func SetUploadMetricsCallback(f func(UploadMetrics)) {
-	uploadMetricsHook = f
 }
 
 // Create creates an S3 object at url and sends multipart upload requests as
@@ -94,6 +80,7 @@ func newUploader(url string, h http.Header, c *Config) (u *Uploader, err error) 
 	u.url = url
 	u.keys = *c.Keys
 	u.client = c.Client
+	u.metricsCallback = c.MetricsCallback
 	if u.client == nil {
 		u.client = http.DefaultClient
 	}
@@ -207,8 +194,8 @@ func (u *Uploader) putPart(p *part) error {
 		return newRespError(resp)
 	}
 
-	if uploadMetricsHook != nil {
-		uploadMetricsHook(
+	if u.metricsCallback != nil {
+		u.metricsCallback(
 			UploadMetrics{
 				TotalBytes: uint64(p.len),
 				TotalTime:  end.Sub(start),

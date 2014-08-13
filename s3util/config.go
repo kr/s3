@@ -13,15 +13,25 @@ package s3util
 import (
 	"github.com/kr/s3"
 	"net/http"
+	"time"
 )
 
+type UploadMetrics struct {
+	TotalBytes uint64
+	TotalTime  time.Duration
+}
+
+type UploadMetricsCallbackFunc func(UploadMetrics)
+
 var DefaultConfig = &Config{
-	Service: s3.DefaultService,
-	Keys:    new(s3.Keys),
+	Service:         s3.DefaultService,
+	Keys:            new(s3.Keys),
+	MetricsCallback: nil,
 }
 
 type Config struct {
 	*s3.Service
 	*s3.Keys
-	*http.Client // if nil, uses http.DefaultClient
+	*http.Client    // if nil, uses http.DefaultClient
+	MetricsCallback UploadMetricsCallbackFunc
 }
