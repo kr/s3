@@ -16,12 +16,12 @@ import (
 	"time"
 )
 
-type UploadMetrics struct {
+type Metrics struct {
 	TotalBytes uint64
 	TotalTime  time.Duration
 }
 
-type UploadMetricsCallbackFunc func(UploadMetrics)
+type MetricsCallbackFunc func(Metrics)
 
 var DefaultConfig = &Config{
 	Service:         s3.DefaultService,
@@ -33,5 +33,5 @@ type Config struct {
 	*s3.Service
 	*s3.Keys
 	*http.Client    // if nil, uses http.DefaultClient
-	MetricsCallback UploadMetricsCallbackFunc
+	MetricsCallback MetricsCallbackFunc
 }

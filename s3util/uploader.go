@@ -50,7 +50,7 @@ type Uploader struct {
 	closed          bool
 	Err             error
 	wg              sync.WaitGroup
-	metricsCallback UploadMetricsCallbackFunc
+	metricsCallback MetricsCallbackFunc
 
 	xml struct {
 		XMLName string `xml:"CompleteMultipartUpload"`
@@ -196,7 +196,7 @@ func (u *Uploader) putPart(p *part) error {
 
 	if u.metricsCallback != nil {
 		u.metricsCallback(
-			UploadMetrics{
+			Metrics{
 				TotalBytes: uint64(p.len),
 				TotalTime:  end.Sub(start),
 			})
