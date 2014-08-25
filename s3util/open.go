@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+type metricsReadCloserDecorator struct {
+	body            io.ReadCloser
+	metricsCallback MetricsCallbackFunc
+}
+
 // Open requests the S3 object at url. An HTTP status other than 200 is
 // considered an error.
 //
@@ -29,5 +34,28 @@ func Open(url string, c *Config) (io.ReadCloser, error) {
 	if resp.StatusCode != 200 {
 		return nil, newRespError(resp)
 	}
-	return resp.Body, nil
+	return &metricsReadCloserDecorator{
+		body:            resp.Body,
+		metricsCallback: c.MetricsCallback,
+	}, nil
+}
+
+func (m *metricsReadCloserDecorator) Read(p []byte) (n int, err error) {
+	start := time.Now()
+	n, err = m.body.Read(p)
+	end := time.Now()
+
+	if m.metricsCallback != nil {
+		m.metricsCallback(
+			Metrics{
+				TotalBytes: uint64(n),
+				TotalTime:  end.Sub(start),
+			})
+	}
+
+	return n, err
+}
+
+func (m *metricsReadCloserDecorator) Close() error {
+	return m.body.Close()
 }
