@@ -190,7 +190,9 @@ func (u *uploader) putPart(p *part) error {
 		return newRespError(resp)
 	}
 	s := resp.Header.Get("etag") // includes quote chars for some reason
-	p.ETag = s[1 : len(s)-1]
+	if len(s) > 1 {
+		p.ETag = s[1 : len(s)-1]
+	}
 	return nil
 }
 
