@@ -116,3 +116,44 @@ func (r repeatReader) Read(p []byte) (int, error) {
 	}
 	return len(p), nil
 }
+
+func TestEmptyEtag(t *testing.T) {
+	defer func() {
+		if err := recover(); err != nil {
+			t.Fatal("uploader panic", err)
+		}
+	}()
+	body := readClose{
+		strings.NewReader(`<UploadId>foo</UploadId>`),
+		make(closeCounter, 100),
+	}
+	c := *DefaultConfig
+	c.Client = &http.Client{
+		Transport: RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			resp := &http.Response{
+				StatusCode: 200,
+				Body: body,
+				Header: http.Header{
+					"Etag": {""},
+				},
+			}
+			return resp, nil
+		}),
+	}
+	u, err := newUploader("https://s3.amazonaws.com/foo/bar", nil, &c)
+	if err != nil {
+		t.Fatal("unexpected err", err)
+	}
+	const size = minPartSize + minPartSize/3
+	n, err := io.Copy(u, io.LimitReader(devZero, size))
+	if err == nil || err.Error() != `received invalid etag ""` {
+		t.Fatalf("expected err: %q", err)
+	}
+	if n != minPartSize {
+		t.Fatalf("wrote %d bytes want %d", n, minPartSize)
+	}
+	err = u.Close()
+	if err == nil || err.Error() != `received invalid etag ""` {
+		t.Fatalf("expected err: %q", err)
+	}
+}
