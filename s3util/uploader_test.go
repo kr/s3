@@ -146,14 +146,14 @@ func TestEmptyEtag(t *testing.T) {
 	}
 	const size = minPartSize + minPartSize/3
 	n, err := io.Copy(u, io.LimitReader(devZero, size))
-	if err != nil {
-		t.Fatal("unexpected err", err)
+	if err == nil || err.Error() != `received invalid etag ""` {
+		t.Fatalf("expected err: %q", err)
 	}
-	if n != size {
-		t.Fatal("wrote %d bytes want %d", n, size)
+	if n != minPartSize {
+		t.Fatalf("wrote %d bytes want %d", n, minPartSize)
 	}
 	err = u.Close()
-	if err != nil {
-		t.Fatal("unexpected err", err)
+	if err == nil || err.Error() != `received invalid etag ""` {
+		t.Fatalf("expected err: %q", err)
 	}
 }

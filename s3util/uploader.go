@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"github.com/kr/s3"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -190,8 +191,8 @@ func (u *uploader) putPart(p *part) error {
 		return newRespError(resp)
 	}
 	s := resp.Header.Get("etag") // includes quote chars for some reason
-	if len(s) > 1 {
-		p.ETag = s[1 : len(s)-1]
+	if len(s) < 2 {
+		return fmt.Errorf("received invalid etag %q", s)
 	}
 	return nil
 }
