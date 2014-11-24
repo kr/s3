@@ -19,6 +19,10 @@ func runUpload(t *testing.T, makeCloser func(io.Reader) io.ReadCloser) *uploader
 			case req.Method == "POST" && q["uploads"] != nil:
 				s = `<UploadId>foo</UploadId>`
 			case req.Method == "POST" && q["uploadId"] != nil:
+				b, _ := ioutil.ReadAll(req.Body)
+				if !strings.Contains(string(b), "<ETag>foo</ETag>") {
+					t.Error("missing ETag")
+				}
 			default:
 				t.Fatal("unexpected request", req)
 			}

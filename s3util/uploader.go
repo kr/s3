@@ -194,6 +194,7 @@ func (u *uploader) putPart(p *part) error {
 	if len(s) < 2 {
 		return fmt.Errorf("received invalid etag %q", s)
 	}
+	p.ETag = s[1 : len(s)-1]
 	return nil
 }
 
