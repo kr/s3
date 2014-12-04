@@ -10,7 +10,9 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -102,7 +104,11 @@ func (s *Service) SignQuery(r *http.Request, t time.Time, k Keys) {
 	s.writeSigQueryData(h, r, t)
 	sig := make([]byte, base64.StdEncoding.EncodedLen(h.Size()))
 	base64.StdEncoding.Encode(sig, h.Sum(nil))
-	r.URL.RawQuery = "AWSAccessKeyId="+k.AccessKey+"&Signature="+string(sig)+"&Expires="+string(t.Unix())
+	if r.URL.RawQuery == "" {
+		r.URL.RawQuery = "AWSAccessKeyId=" + k.AccessKey + "&Signature=" + url.QueryEscape(string(sig)) + "&Expires=" + strconv.FormatInt(t.Unix(), 10)
+	} else {
+		r.URL.RawQuery += "&AWSAccessKeyId=" + k.AccessKey + "&Signature=" + url.QueryEscape(string(sig)) + "&Expires=" + strconv.FormatInt(t.Unix(), 10)
+	}
 }
 
 func (s *Service) writeSigData(w io.Writer, r *http.Request) {
@@ -127,7 +133,7 @@ func (s *Service) writeSigQueryData(w io.Writer, r *http.Request, t time.Time) {
 	w.Write([]byte{'\n'})
 	w.Write([]byte(r.Header.Get("content-type")))
 	w.Write([]byte{'\n'})
-	w.Write([]byte(string(t.Unix())))
+	w.Write([]byte(strconv.FormatInt(t.Unix(), 10)))
 	w.Write([]byte{'\n'})
 	writeAmzHeaders(w, r)
 	s.writeResource(w, r)
