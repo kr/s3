@@ -122,7 +122,7 @@ func (s *Service) writeSigData(w io.Writer, r *http.Request) {
 }
 
 func (s *Service) writeResource(w io.Writer, r *http.Request) {
-	s.writeVhostBucket(w, strings.ToLower(r.Host))
+	s.writeVhostBucket(w, strings.ToLower(r.URL.Host))
 	path := r.URL.RequestURI()
 	if r.URL.RawQuery != "" {
 		path = path[:len(path)-len(r.URL.RawQuery)-1]
