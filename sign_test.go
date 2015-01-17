@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"testing"
+	"time"
 )
 
 var exKeys = Keys{
@@ -308,6 +309,73 @@ func TestVhostBucket(t *testing.T) {
 		ts.svc.writeVhostBucket(&g, r.Host)
 		if g.String() != ts.w {
 			t.Errorf("test %d: want %q, got %q", i, ts.w, g.String())
+		}
+	}
+}
+
+var signQueryTest = []struct {
+	service  *Service
+	method   string
+	url      string
+	more     http.Header
+	expires  int64
+	expBuf   string
+	expQuery string
+}{
+	{
+		DefaultService,
+		"GET",
+		"http://johnsmith.s3.amazonaws.com/photos/puppy.jpg",
+		nil,
+		1175139620,
+		"GET\n\n\n1175139620\n/johnsmith/photos/puppy.jpg",
+		"AWSAccessKeyId=AKIAIOSFODNN7EXAMPLE&Signature=NpgCjnDzrM%2BWFzoENXmpNDUsSn8%3D&Expires=1175139620",
+	}, {
+		DefaultService,
+		"GET",
+		"http://s3.amazonaws.com/johnsmith/photos/puppy.jpg",
+		nil,
+		1175139620,
+		"GET\n\n\n1175139620\n/johnsmith/photos/puppy.jpg",
+		"AWSAccessKeyId=AKIAIOSFODNN7EXAMPLE&Signature=NpgCjnDzrM%2BWFzoENXmpNDUsSn8%3D&Expires=1175139620",
+	}, {
+		DefaultService,
+		"GET",
+		"http://johnsmith.s3.amazonaws.com/photos/puppy.jpg?acl",
+		nil,
+		1175139620,
+		"GET\n\n\n1175139620\n/johnsmith/photos/puppy.jpg?acl",
+		"acl&AWSAccessKeyId=AKIAIOSFODNN7EXAMPLE&Signature=2t9CVTYWEqyKpbsimoCqHNLfxsA%3D&Expires=1175139620",
+	},
+}
+
+func TestQuerySign(t *testing.T) {
+	for _, ts := range signQueryTest {
+		r, err := http.NewRequest(ts.method, ts.url, nil)
+		if err != nil {
+			panic(err)
+		}
+
+		for k, vs := range ts.more {
+			for _, v := range vs {
+				r.Header.Add(k, v)
+			}
+		}
+		var buf bytes.Buffer
+		ts.service.writeSigQueryData(&buf, r, time.Unix(ts.expires, 0))
+		if buf.String() != ts.expBuf {
+			t.Errorf("in %s:", r.Method)
+			t.Logf("url %s", r.URL.String())
+			t.Logf("exp %q", ts.expBuf)
+			t.Logf("got %q", buf.String())
+		}
+
+		ts.service.SignQuery(r, time.Unix(ts.expires, 0), exKeys)
+		if got := r.URL.RawQuery; got != ts.expQuery {
+			t.Errorf("in %s:", r.Method)
+			t.Logf("url %s", r.URL.String())
+			t.Logf("exp %q", ts.expQuery)
+			t.Logf("got %q", got)
 		}
 	}
 }
