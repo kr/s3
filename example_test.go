@@ -2,13 +2,56 @@ package s3_test
 
 import (
 	"fmt"
-	"github.com/kr/s3"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/kr/s3"
 )
+
+func ExampleClient() {
+	client := s3.Client(s3.Keys{
+		AccessKey: os.Getenv("S3_ACCESS_KEY"),
+		SecretKey: os.Getenv("S3_SECRET_KEY"),
+	})
+	resp, err := client.Get("https://example.s3.amazonaws.com/cat.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+	io.Copy(os.Stdout, resp.Body)
+}
+
+func ExampleClient_post() {
+	client := s3.Client(s3.Keys{
+		AccessKey: os.Getenv("S3_ACCESS_KEY"),
+		SecretKey: os.Getenv("S3_SECRET_KEY"),
+	})
+	data := strings.NewReader("hello, world")
+	resp, err := client.Post("https://example.s3.amazonaws.com/foo", "text/plain", data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(resp.StatusCode)
+}
+
+func ExampleClient_put() {
+	client := s3.Client(s3.Keys{
+		AccessKey: os.Getenv("S3_ACCESS_KEY"),
+		SecretKey: os.Getenv("S3_SECRET_KEY"),
+	})
+	data := strings.NewReader("hello, world")
+	r, _ := http.NewRequest("PUT", "https://example.s3.amazonaws.com/foo", data)
+	r.Header.Set("X-Amz-Acl", "public-read")
+	resp, err := client.Do(r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(resp.StatusCode)
+}
 
 func ExampleSign() {
 	keys := s3.Keys{
@@ -25,6 +68,5 @@ func ExampleSign() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	fmt.Println(resp.StatusCode)
 }
