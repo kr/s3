@@ -16,6 +16,13 @@ func ExampleCreate() {
 	w.Close()
 }
 
+func ExampleDelete() {
+	s3util.DefaultConfig.AccessKey = "...access key..."
+	s3util.DefaultConfig.SecretKey = "...secret key..."
+	r, _ := s3util.Delete("https://mybucket.s3.amazonaws.com/log.txt", nil)
+	r.Close()
+}
+
 func ExampleOpen() {
 	s3util.DefaultConfig.AccessKey = "...access key..."
 	s3util.DefaultConfig.SecretKey = "...secret key..."
