@@ -2,7 +2,7 @@ package s3_test
 
 import (
 	"fmt"
-	"github.com/kr/s3"
+	"github.com/axiomzen/s3"
 	"log"
 	"net/http"
 	"os"
