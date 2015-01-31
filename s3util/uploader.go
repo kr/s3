@@ -3,8 +3,8 @@ package s3util
 import (
 	"bytes"
 	"encoding/xml"
-	"github.com/kr/s3"
 	"fmt"
+	"github.com/axiomzen/s3"
 	"io"
 	"net/http"
 	"net/url"
