@@ -3,8 +3,8 @@ package s3util
 import (
 	"bytes"
 	"encoding/xml"
-	"github.com/kr/s3"
 	"fmt"
+	"github.com/kr/s3"
 	"io"
 	"net/http"
 	"net/url"
@@ -199,6 +199,9 @@ func (u *uploader) putPart(p *part) error {
 }
 
 func (u *uploader) Close() error {
+	if u == nil {
+		return nil
+	}
 	if u.closed {
 		return syscall.EINVAL
 	}
