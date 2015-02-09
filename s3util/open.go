@@ -15,7 +15,7 @@ type metricsReadCloserDecorator struct {
 // considered an error.
 //
 // If c is nil, Open uses DefaultConfig.
-func Open(url string, c *Config) (io.ReadCloser, error) {
+func Open(url string, c *Config) (io.ReadCloser, *http.Response, error) {
 	if c == nil {
 		c = DefaultConfig
 	}
@@ -29,15 +29,15 @@ func Open(url string, c *Config) (io.ReadCloser, error) {
 	}
 	resp, err := client.Do(r)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if resp.StatusCode != 200 {
-		return nil, newRespError(resp)
+		return nil, nil, newRespError(resp)
 	}
 	return &metricsReadCloserDecorator{
 		body:            resp.Body,
 		metricsCallback: c.MetricsCallback,
-	}, nil
+	}, resp, nil
 }
 
 func (m *metricsReadCloserDecorator) Read(p []byte) (n int, err error) {
@@ -54,6 +54,31 @@ func (m *metricsReadCloserDecorator) Read(p []byte) (n int, err error) {
 	}
 
 	return n, err
+}
+
+// Metadata requests the S3 object's metadata at url. An HTTP status
+// other than 200 is considered an error.
+//
+// If c is nil, Metadata uses DefaultConfig.
+func Metadata(url string, c *Config) (*http.Response, error) {
+	if c == nil {
+		c = DefaultConfig
+	}
+	r, _ := http.NewRequest("HEAD", url, nil)
+	r.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+	c.Sign(r, *c.Keys)
+	client := c.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(r)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		return nil, newRespError(resp)
+	}
+	return resp, nil
 }
 
 func (m *metricsReadCloserDecorator) Close() error {
