@@ -225,12 +225,23 @@ func (u *Uploader) prepareClose() error {
 }
 
 func (u *Uploader) Close() error {
+	resp, err := u.close()
+	resp.Body.Close()
+	return err
+}
+
+// It's the caller's responsibility to close the response, if any.
+func (u *Uploader) CloseWithResponse() (*http.Response, error) {
+	return u.close()
+}
+
+func (u *Uploader) close() (*http.Response, error) {
 	if err := u.prepareClose(); err != nil {
-		return err
+		return nil, err
 	}
 	body, err := xml.Marshal(u.xml)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	b := bytes.NewBuffer(body)
 	v := url.Values{}
@@ -238,7 +249,7 @@ func (u *Uploader) Close() error {
 
 	req, err := http.NewRequest("POST", u.url+"?"+v.Encode(), b)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var finalError error
@@ -254,10 +265,9 @@ func (u *Uploader) Close() error {
 			finalError = newRespError(resp)
 			continue
 		}
-		resp.Body.Close()
-		return nil
+		return resp, nil
 	}
-	return finalError
+	return nil, finalError
 }
 
 func (u *Uploader) abort() {
