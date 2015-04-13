@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func runUpload(t *testing.T, makeCloser func(io.Reader) io.ReadCloser) *uploader {
+func runUpload(t *testing.T, makeCloser func(io.Reader) io.ReadCloser) *Uploader {
 	c := *DefaultConfig
 	c.Client = &http.Client{
 		Transport: RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -36,11 +36,11 @@ func runUpload(t *testing.T, makeCloser func(io.Reader) io.ReadCloser) *uploader
 			return resp, nil
 		}),
 	}
-	u, err := newUploader("https://s3.amazonaws.com/foo/bar", nil, &c)
+	u, err := Create("https://s3.amazonaws.com/foo/bar", nil, &c)
 	if err != nil {
 		t.Fatal("unexpected err", err)
 	}
-	const size = minPartSize + minPartSize/3
+	const size = MinPartSize + MinPartSize/3
 	n, err := io.Copy(u, io.LimitReader(devZero, size))
 	if err != nil {
 		t.Fatal("unexpected err", err)
@@ -69,7 +69,7 @@ func TestUploaderCloseRespBody(t *testing.T) {
 }
 
 // Used in TestUploaderFreesBuffers to force liveness.
-var DummyUploader *uploader
+var DummyUploader *Uploader
 
 func TestUploaderFreesBuffers(t *testing.T) {
 	var m0, m1 runtime.MemStats
@@ -87,8 +87,8 @@ func TestUploaderFreesBuffers(t *testing.T) {
 	// The uploader never allocates buffers smaller than minPartSize,
 	// so if the increase is < minPartSize we know none are reachable.
 	inc := m1.Alloc - m0.Alloc
-	if m1.Alloc > m0.Alloc && inc >= minPartSize {
-		t.Errorf("inc = %d want <%d", inc, minPartSize)
+	if m1.Alloc > m0.Alloc && inc >= MinPartSize {
+		t.Errorf("inc = %d want <%d", inc, MinPartSize)
 	}
 }
 
