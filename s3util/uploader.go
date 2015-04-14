@@ -3,7 +3,6 @@ package s3util
 import (
 	"bytes"
 	"encoding/xml"
-	"github.com/kr/s3"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/kr/s3"
 )
 
 // defined by amazon
@@ -20,11 +21,6 @@ const (
 	maxPartSize = 1<<31 - 1 // for 32-bit use; amz max is 5GiB
 	maxObjSize  = 5 * 1024 * 1024 * 1024 * 1024
 	maxNPart    = 10000
-)
-
-const (
-	concurrency = 5
-	nTry        = 2
 )
 
 type part struct {
@@ -51,6 +47,7 @@ type uploader struct {
 	closed bool
 	err    error
 	wg     sync.WaitGroup
+	numTry int
 
 	xml struct {
 		XMLName string `xml:"CompleteMultipartUpload"`
@@ -80,6 +77,7 @@ func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) 
 	u.url = url
 	u.keys = *c.Keys
 	u.client = c.Client
+	u.numTry = c.NumTry
 	if u.client == nil {
 		u.client = http.DefaultClient
 	}
@@ -108,7 +106,7 @@ func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) 
 		return nil, err
 	}
 	u.ch = make(chan *part)
-	for i := 0; i < concurrency; i++ {
+	for i := 0; i < c.Concurrency; i++ {
 		go u.worker()
 	}
 	return u, nil
@@ -154,12 +152,12 @@ func (u *uploader) worker() {
 	}
 }
 
-// Calls putPart up to nTry times to recover from transient errors.
+// Calls putPart up to numTry times to recover from transient errors.
 func (u *uploader) retryUploadPart(p *part) {
 	defer u.wg.Done()
 	defer func() { p.r = nil }() // free the large buffer
 	var err error
-	for i := 0; i < nTry; i++ {
+	for i := 0; i < u.numTry; i++ {
 		p.r.Seek(0, 0)
 		err = u.putPart(p)
 		if err == nil {
