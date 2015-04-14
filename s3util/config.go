@@ -11,17 +11,22 @@ package s3util
 // TODO(kr): parse error responses; return structured data
 
 import (
-	"github.com/kr/s3"
 	"net/http"
+
+	"github.com/kr/s3"
 )
 
 var DefaultConfig = &Config{
-	Service: s3.DefaultService,
-	Keys:    new(s3.Keys),
+	Service:     s3.DefaultService,
+	Keys:        new(s3.Keys),
+	Concurrency: 5,
+	NumTry:      2,
 }
 
 type Config struct {
 	*s3.Service
 	*s3.Keys
-	*http.Client // if nil, uses http.DefaultClient
+	*http.Client     // if nil, uses http.DefaultClient
+	Concurrency  int // Number of concurrent upload workers
+	NumTry       int // Number of tries before recording an error
 }
