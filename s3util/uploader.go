@@ -3,15 +3,17 @@ package s3util
 import (
 	"bytes"
 	"encoding/xml"
-	"github.com/kr/s3"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/kr/s3"
 )
 
 // defined by amazon
@@ -190,11 +192,14 @@ func (u *uploader) putPart(p *part) error {
 	if resp.StatusCode != 200 {
 		return newRespError(resp)
 	}
-	s := resp.Header.Get("etag") // includes quote chars for some reason
-	if len(s) < 2 {
-		return fmt.Errorf("received invalid etag %q", s)
+
+	s := resp.Header.Get("etag")
+	s = strings.Trim(s, `"`) // includes quote chars for some reason
+	if s == "" {
+		return fmt.Errorf("received empty etag")
 	}
-	p.ETag = s[1 : len(s)-1]
+	p.ETag = s
+
 	return nil
 }
 
