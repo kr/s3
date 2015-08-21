@@ -3,8 +3,8 @@ package s3util
 import (
 	"bytes"
 	"encoding/xml"
-	"github.com/kr/s3"
 	"fmt"
+	"github.com/kr/s3"
 	"io"
 	"net/http"
 	"net/url"
@@ -198,21 +198,19 @@ func (u *uploader) putPart(p *part) error {
 	return nil
 }
 
-func (u *uploader) Close() error {
-	if u.closed {
-		return syscall.EINVAL
+//retry completing the upload nTry times to
+func (u *uploader) retryCompleteUpload() error {
+	var err error
+	for i := 0; i < nTry; i++ {
+		err = u.completeUpload()
+		if err == nil {
+			return nil
+		}
 	}
-	if cap(u.buf) > 0 {
-		u.flush()
-	}
-	u.wg.Wait()
-	close(u.ch)
-	u.closed = true
-	if u.err != nil {
-		u.abort()
-		return u.err
-	}
+	return err
+}
 
+func (u *uploader) completeUpload() error {
 	body, err := xml.Marshal(u.xml)
 	if err != nil {
 		return err
@@ -230,11 +228,30 @@ func (u *uploader) Close() error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return newRespError(resp)
 	}
-	resp.Body.Close()
 	return nil
+}
+
+func (u *uploader) Close() error {
+	if u.closed {
+		return syscall.EINVAL
+	}
+	if cap(u.buf) > 0 {
+		u.flush()
+	}
+	u.wg.Wait()
+	close(u.ch)
+	u.closed = true
+	if u.err != nil {
+		u.abort()
+		return u.err
+	}
+
+	err := u.retryCompleteUpload()
+	return err
 }
 
 func (u *uploader) abort() {
