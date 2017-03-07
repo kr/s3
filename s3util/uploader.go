@@ -36,7 +36,7 @@ type part struct {
 	ETag       string
 }
 
-type uploader struct {
+type Uploader struct {
 	s3       s3.Service
 	keys     s3.Keys
 	url      string
@@ -49,13 +49,28 @@ type uploader struct {
 	ch     chan *part
 	part   int
 	closed bool
-	err    error
+	Err    error
 	wg     sync.WaitGroup
 
 	xml struct {
 		XMLName string `xml:"CompleteMultipartUpload"`
 		Part    []*part
 	}
+}
+
+type UploadMetrics struct {
+	TotalBytes uint64
+	TotalTime  time.Duration
+}
+
+var (
+	uploadMetricsHook func(UploadMetrics)
+)
+
+// Set metrics callback. Will receive an UploadMetrics instance for
+// each part uploaded.
+func SetUploadMetricsCallback(f func(UploadMetrics)) {
+	uploadMetricsHook = f
 }
 
 // Create creates an S3 object at url and sends multipart upload requests as
@@ -74,8 +89,8 @@ func Create(url string, h http.Header, c *Config) (io.WriteCloser, error) {
 // See http://docs.amazonwebservices.com/AmazonS3/latest/dev/mpuoverview.html.
 // This initial request returns an UploadId that we use to identify
 // subsequent PUT requests.
-func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) {
-	u = new(uploader)
+func newUploader(url string, h http.Header, c *Config) (u *Uploader, err error) {
+	u = new(Uploader)
 	u.s3 = *c.Service
 	u.url = url
 	u.keys = *c.Keys
@@ -114,12 +129,12 @@ func newUploader(url string, h http.Header, c *Config) (u *uploader, err error) 
 	return u, nil
 }
 
-func (u *uploader) Write(p []byte) (n int, err error) {
+func (u *Uploader) Write(p []byte) (n int, err error) {
 	if u.closed {
 		return 0, syscall.EINVAL
 	}
-	if u.err != nil {
-		return 0, u.err
+	if u.Err != nil {
+		return 0, u.Err
 	}
 	for n < len(p) {
 		if cap(u.buf) == 0 {
@@ -139,7 +154,7 @@ func (u *uploader) Write(p []byte) (n int, err error) {
 	return n, nil
 }
 
-func (u *uploader) flush() {
+func (u *Uploader) flush() {
 	u.wg.Add(1)
 	u.part++
 	p := &part{bytes.NewReader(u.buf[:u.off]), int64(u.off), u.part, ""}
@@ -148,14 +163,14 @@ func (u *uploader) flush() {
 	u.buf, u.off = nil, 0
 }
 
-func (u *uploader) worker() {
+func (u *Uploader) worker() {
 	for p := range u.ch {
 		u.retryUploadPart(p)
 	}
 }
 
 // Calls putPart up to nTry times to recover from transient errors.
-func (u *uploader) retryUploadPart(p *part) {
+func (u *Uploader) retryUploadPart(p *part) {
 	defer u.wg.Done()
 	defer func() { p.r = nil }() // free the large buffer
 	var err error
@@ -166,12 +181,12 @@ func (u *uploader) retryUploadPart(p *part) {
 			return
 		}
 	}
-	u.err = err
+	u.Err = err
 }
 
 // Uploads part p, reading its contents from p.r.
 // Stores the ETag in p.ETag.
-func (u *uploader) putPart(p *part) error {
+func (u *Uploader) putPart(p *part) error {
 	v := url.Values{}
 	v.Set("partNumber", strconv.Itoa(p.PartNumber))
 	v.Set("uploadId", u.UploadId)
@@ -182,7 +197,9 @@ func (u *uploader) putPart(p *part) error {
 	req.ContentLength = p.len
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	u.s3.Sign(req, u.keys)
+	start := time.Now()
 	resp, err := u.client.Do(req)
+	end := time.Now()
 	if err != nil {
 		return err
 	}
@@ -190,6 +207,15 @@ func (u *uploader) putPart(p *part) error {
 	if resp.StatusCode != 200 {
 		return newRespError(resp)
 	}
+
+	if uploadMetricsHook != nil {
+		uploadMetricsHook(
+			UploadMetrics{
+				TotalBytes: uint64(p.len),
+				TotalTime:  end.Sub(start),
+			})
+	}
+
 	s := resp.Header.Get("etag") // includes quote chars for some reason
 	if len(s) < 2 {
 		return fmt.Errorf("received invalid etag %q", s)
@@ -198,7 +224,7 @@ func (u *uploader) putPart(p *part) error {
 	return nil
 }
 
-func (u *uploader) Close() error {
+func (u *Uploader) prepareClose() error {
 	if u.closed {
 		return syscall.EINVAL
 	}
@@ -208,11 +234,17 @@ func (u *uploader) Close() error {
 	u.wg.Wait()
 	close(u.ch)
 	u.closed = true
-	if u.err != nil {
+	if u.Err != nil {
 		u.abort()
-		return u.err
+		return u.Err
 	}
+	return nil
+}
 
+func (u *Uploader) Close() error {
+	if err := u.prepareClose(); err != nil {
+		return err
+	}
 	body, err := xml.Marshal(u.xml)
 	if err != nil {
 		return err
@@ -220,24 +252,32 @@ func (u *uploader) Close() error {
 	b := bytes.NewBuffer(body)
 	v := url.Values{}
 	v.Set("uploadId", u.UploadId)
-	req, err := http.NewRequest("POST", u.url+"?"+v.Encode(), b)
-	if err != nil {
-		return err
+
+	var finalError error
+	for retries := 0; retries < 3; retries++ {
+		req, err := http.NewRequest("POST", u.url+"?"+v.Encode(), b)
+		if err != nil {
+			finalError = err
+			continue
+		}
+		req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+		u.s3.Sign(req, u.keys)
+		resp, err := u.client.Do(req)
+		if err != nil {
+			finalError = err
+			continue
+		}
+		if resp.StatusCode != 200 {
+			finalError = newRespError(resp)
+			continue
+		}
+		resp.Body.Close()
+		return nil
 	}
-	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
-	u.s3.Sign(req, u.keys)
-	resp, err := u.client.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 200 {
-		return newRespError(resp)
-	}
-	resp.Body.Close()
-	return nil
+	return finalError
 }
 
-func (u *uploader) abort() {
+func (u *Uploader) abort() {
 	// TODO(kr): devise a reasonable way to report an error here in addition
 	// to the error that caused the abort.
 	v := url.Values{}
